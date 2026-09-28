@@ -5,7 +5,9 @@ import { join } from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import {
+  DUB_ID_RE,
   hashSecret,
+  issueDubReceipt,
   issueGuestToken,
   verifyGuestToken,
   verifyUploadTicket,
@@ -21,8 +23,6 @@ const ReportBody = z.object({
   targetId: z.string().min(1).max(128),
   reason: z.string().min(1).max(500),
 });
-
-export const DUB_ID_RE = /^[A-Z0-9]{4,6}\.\d{1,2}\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{12}$/;
 
 /** Detects the container from magic bytes — the Content-Type header is not trusted (§14). */
 export function sniffAudio(buf: Buffer): { mime: string; ext: string } | null {
@@ -95,7 +95,7 @@ export async function publicRoutes(app: FastifyInstance) {
       const kind = sniffAudio(body);
       if (!kind) return reply.status(415).send({ error: "unsupported_media" });
 
-      const dubId = `${ticket.room}.${ticket.round}.${ticket.sub}.${randomBytes(9).toString("base64url")}`;
+      const dubId = randomBytes(16).toString("base64url");
       const rel = join("dubs", ticket.room, String(ticket.round), `${dubId}.${kind.ext}`);
       await mkdir(join(config.dataDir, "dubs", ticket.room, String(ticket.round)), {
         recursive: true,
@@ -111,11 +111,11 @@ export async function publicRoutes(app: FastifyInstance) {
         bytes: body.length,
         ttlMs: config.dubTtlMs,
       });
-      return { dubId };
+      return { dubId, receipt: issueDubReceipt(dubId, ticket, config.signingKeys[0]!) };
     },
   );
 
-  /** Dubs are only reachable by their unguessable id, which only room members receive. */
+  /** Dubs are only reachable by their unguessable opaque id, which only room members receive. */
   app.get<{ Params: { id: string } }>("/media/dubs/:id", async (req, reply) => {
     const id = req.params.id;
     if (!DUB_ID_RE.test(id)) return reply.status(404).send({ error: "not_found" });

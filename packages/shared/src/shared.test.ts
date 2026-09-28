@@ -21,12 +21,13 @@ import {
   type PlayerPublic,
 } from "./index.ts";
 import {
-  dubBelongsTo,
+  issueDubReceipt,
   issueGuestToken,
   issueUploadTicket,
   sign,
   verify,
   verifyGuestToken,
+  verifyDubReceipt,
   verifyUploadTicket,
 } from "./token.ts";
 
@@ -244,7 +245,8 @@ describe("tokens", () => {
     const { ticket } = issueUploadTicket("ABCDE", 2, "p1", key);
     expect(verifyUploadTicket(ticket, [key])).toMatchObject({ room: "ABCDE", round: 2, sub: "p1" });
     expect(verifyGuestToken(ticket, [key])).toBeNull();
-    expect(dubBelongsTo("ABCDE.2.p1.xyz", "ABCDE", 2, "p1")).toBe(true);
-    expect(dubBelongsTo("ABCDE.2.p10.xyz", "ABCDE", 2, "p1")).toBe(false);
+    const receipt = issueDubReceipt("a".repeat(22), { room: "ABCDE", round: 2, sub: "p1" }, key);
+    expect(verifyDubReceipt(receipt, [key])).toMatchObject({ dub: "a".repeat(22), sub: "p1" });
+    expect(verifyUploadTicket(receipt, [key])).toBeNull();
   });
 });

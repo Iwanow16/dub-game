@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { emptyManifest } from "@dubroom/clip-format";
 import { Db } from "@dubroom/db";
-import { issueUploadTicket } from "@dubroom/shared/token";
+import { issueUploadTicket, verifyDubReceipt } from "@dubroom/shared/token";
 import { buildApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
 
@@ -82,8 +82,14 @@ describe("dubs", () => {
       payload: webm(),
     });
     expect(up.statusCode).toBe(200);
-    const { dubId } = up.json() as { dubId: string };
-    expect(dubId.startsWith(`ABCDE.1.${pid}.`)).toBe(true);
+    const { dubId, receipt } = up.json() as { dubId: string; receipt: string };
+    expect(dubId).not.toContain(pid);
+    expect(verifyDubReceipt(receipt, [KEY])).toMatchObject({
+      dub: dubId,
+      room: "ABCDE",
+      round: 1,
+      sub: pid,
+    });
     const get = await app.inject({ method: "GET", url: `/media/dubs/${dubId}` });
     expect(get.statusCode).toBe(200);
     expect(get.headers["content-type"]).toBe("audio/webm");
