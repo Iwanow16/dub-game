@@ -93,7 +93,13 @@ function GameHeader({ room }: { room: RoomSnapshot }) {
   const waitingFor =
     r && ["pick", "record", "vote"].includes(room.phase)
       ? room.players
-          .filter((p) => p.connected && r.participants.includes(p.id) && p.status !== "done")
+          .filter((p) => {
+            if (!p.connected || p.status === "done") return false;
+            // in "host picks" mode only the host acts during pick
+            if (room.phase === "pick" && room.settings.clipPick === "host") return p.isHost;
+            // everyone connected votes (spectators too); pick/record are for participants
+            return room.phase === "vote" || r.participants.includes(p.id);
+          })
           .map((p) => p.name)
       : [];
   const onTick = useCallback((s: number) => {
