@@ -1,0 +1,135 @@
+# Internal reverse proxy (§21.2). TLS terminates at Cloudflare; cloudflared talks plain HTTP to
+# caddy:8080 inside the Docker network. No port of this container is published.
+{
+	auto_https off
+	admin off
+	servers {
+		# the real client IP comes from Cloudflare (§21.7); only trust it from private networks
+		trusted_proxies static private_ranges
+		client_ip_headers CF-Connecting-IP
+	}
+	log {
+		output stdout
+		format json
+	}
+}
+
+(security_headers) {
+	header {
+		# §22.10 — connect-src 'self' covers same-origin wss:// in modern browsers
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		Strict-Transport-Security "max-age=15552000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "microphone=(self), camera=(), geolocation=(), payment=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+	}
+}
+
+# stop.sh --maintenance creates DATA_DIR/public/maintenance (§22.11 incident runbook)
+(maintenance) {
+	@maintenance file {
+		root /data/public
+		try_files maintenance
+	}
+	handle @maintenance {
+		header Retry-After "300"
+		respond "DubRoom на обслуживании — скоро вернёмся. / DubRoom is under maintenance." 503
+	}
+}
+
+# published packages: content-hashed names → cache forever at the edge and in browsers (§11.2)
+(clip_media) {
+	handle_path /media/clips/* {
+		root * /data/clips
+		@manifest path */manifest.json
+		header @manifest Cache-Control "public, max-age=60, stale-while-revalidate=600"
+		@hashed not path */manifest.json
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+}
+
+(help) {
+	handle_path /help/* {
+		root * /srv/help
+		file_server
+	}
+}
+
+(spa) {
+	@missing_asset {
+		path /assets/*
+		not file
+	}
+	respond @missing_asset 404
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	try_files {path} /index.html
+	file_server
+}
+
+# ---------- Clip Studio (behind Cloudflare Access, §22.9) ----------
+http://{$STUDIO_HOST:studio.localhost}:8080 {
+	import security_headers
+	encode zstd gzip
+	# `route` keeps the written order, so maintenance is checked first
+	route {
+		import maintenance
+		handle /api/studio/* {
+			reverse_proxy api:3000
+		}
+		handle /api/* {
+			respond 404
+		}
+		import clip_media
+		import help
+		handle {
+			root * /srv/studio
+			import spa
+		}
+	}
+}
+
+# ---------- the game (PLAY_HOST, and any hostname a quick tunnel gets) ----------
+:8080 {
+	import security_headers
+	encode zstd gzip
+	route {
+		import maintenance
+		# the Studio API is only reachable on the Studio hostname (§22.9 WAF rule, enforced here too)
+		handle /api/studio/* {
+			respond 404
+		}
+		handle /ws {
+			reverse_proxy game-server:3001
+		}
+		handle /api/rooms* {
+			reverse_proxy game-server:3001
+		}
+		handle /api/game/* {
+			reverse_proxy game-server:3001
+		}
+		handle /api/* {
+			header Cache-Control "no-store"
+			reverse_proxy api:3000
+		}
+		handle /media/dubs/* {
+			reverse_proxy api:3000
+		}
+		import clip_media
+		handle /catalog.json {
+			root * /data/public
+			header Cache-Control "public, max-age=60, stale-while-revalidate=600"
+			file_server
+		}
+		import help
+		handle {
+			root * /srv/web
+			@sw path /sw.js
+			header @sw Cache-Control "no-cache"
+			import spa
+		}
+	}
+}

@@ -1,0 +1,135 @@
+# DubRoom production stack (§21.2, §22.5). Run through scripts/start.sh, which passes
+#   --project-directory /opt/dubroom -f infra/docker-compose.yml --env-file .env
+# No service publishes ports: the only way in is the outbound Cloudflare Tunnel.
+# For local debugging add infra/docker-compose.local.yml (binds caddy to 127.0.0.1:8080).
+
+name: dubroom
+
+x-hardening: &hardening
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  user: "10001:10001"
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+x-app: &app
+  <<: *hardening
+  image: ${DUBROOM_IMAGE:-dubroom/app}:${DUBROOM_VERSION:-local}
+  build:
+    context: .
+    dockerfile: infra/Dockerfile
+    target: app
+    args:
+      APP_VERSION: ${DUBROOM_VERSION:-local}
+  volumes:
+    - ${DATA_DIR:-./data}:/data
+
+services:
+  api:
+    <<: *app
+    command: ["node", "/app/api/dist/main.js"]
+    environment:
+      TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?run scripts/setup.sh}
+      STUDIO_KEY: ${STUDIO_KEY:?run scripts/setup.sh}
+      STUDIO_HOST: ${STUDIO_HOST:-studio.localhost}
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
+      TRUST_CF_CONNECTING_IP: "true"
+      SERVE_MEDIA: "false"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources: { limits: { cpus: "1.0", memory: 512M } }
+
+  game-server:
+    <<: *app
+    command: ["node", "/app/game-server/dist/main.js"]
+    stop_grace_period: 330s # stop.sh lets running rounds finish (≤ 5 min)
+    environment:
+      TOKEN_SIGNING_KEY: ${TOKEN_SIGNING_KEY:?run scripts/setup.sh}
+      API_INTERNAL_URL: http://api:3000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      TRUST_CF_CONNECTING_IP: "true"
+      DRAIN_SECONDS: ${DRAIN_SECONDS:-300}
+      MAX_ROOMS: ${MAX_ROOMS:-500}
+    volumes: []
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3001/api/game/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources: { limits: { cpus: "1.0", memory: 512M } }
+
+  media-worker:
+    <<: *app
+    command: ["node", "/app/media-worker/dist/main.js"]
+    # untrusted media is processed with no network at all (§22.6, ADR-0003)
+    network_mode: none
+    environment:
+      JOB_TIMEOUT_MIN: ${JOB_TIMEOUT_MIN:-10}
+    deploy:
+      resources: { limits: { cpus: "${WORKER_CPUS:-2.0}", memory: 2G } }
+
+  caddy:
+    <<: *hardening
+    image: ${DUBROOM_CADDY_IMAGE:-dubroom/caddy}:${DUBROOM_VERSION:-local}
+    build:
+      context: .
+      dockerfile: infra/Dockerfile
+      target: caddy
+    environment:
+      STUDIO_HOST: ${STUDIO_HOST:-studio.localhost}
+    volumes:
+      - ${DATA_DIR:-./data}:/data:ro
+    networks: [edge, backend]
+    depends_on:
+      api: { condition: service_healthy }
+      game-server: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/api/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources: { limits: { cpus: "0.5", memory: 256M } }
+
+  # Tunnel modes (§21.3): A — token from the Zero Trust dashboard; B — locally managed
+  # (infra/cloudflared/config.yml); C — quick tunnel on *.trycloudflare.com (demo only).
+  cloudflared:
+    <<: *hardening
+    image: cloudflare/cloudflared:${CLOUDFLARED_VERSION:-2025.9.1}
+    user: "65532:65532"
+    profiles: [tunnel]
+    command: ${TUNNEL_COMMAND:-tunnel --no-autoupdate --metrics 0.0.0.0:2000 run}
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    volumes:
+      - ./infra/cloudflared:/etc/cloudflared:ro
+    networks: [edge]
+    depends_on: [caddy]
+    deploy:
+      replicas: ${TUNNEL_REPLICAS:-2}
+      resources: { limits: { cpus: "0.5", memory: 128M } }
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "localhost:2000", "ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  # only cloudflared reaches the internet; everything else is internal (§22.5)
+  edge: {}
+  backend:
+    internal: true

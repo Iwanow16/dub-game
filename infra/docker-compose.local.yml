@@ -1,0 +1,7 @@
+# Local debugging: publish caddy on loopback only (never on 0.0.0.0 — Docker bypasses ufw, §22.4).
+#   game:   http://localhost:8080
+#   studio: http://studio.localhost:8080
+services:
+  caddy:
+    ports:
+      - "127.0.0.1:${LOCAL_PORT:-8080}:8080"
