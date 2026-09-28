@@ -1,0 +1,86 @@
+{
+  "schema": "dubroom.clip/1",
+  "id": "c_catnegotiat01",
+  "slug": "kot-peregovorshchik",
+  "version": 1,
+  "title": {
+    "ru": "Кот-переговорщик",
+    "en": "Negotiator Cat"
+  },
+  "durationMs": 16000,
+  "ageRating": "0+",
+  "tags": ["животные", "комедия"],
+  "credit": "DubRoom starter pack (synthetic scene)",
+  "license": "CC0 1.0",
+  "roles": [
+    {
+      "id": "r1",
+      "name": {
+        "ru": "Кот",
+        "en": "Cat"
+      },
+      "color": "#FF8A3D"
+    },
+    {
+      "id": "r2",
+      "name": {
+        "ru": "Пёс",
+        "en": "Dog"
+      },
+      "color": "#3DA5FF"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "role": "r1",
+      "startMs": 1200,
+      "endMs": 3900,
+      "text": {
+        "ru": "Мы оба знаем, чья это миска.",
+        "en": "We both know whose bowl this is."
+      },
+      "hint": "уверенно"
+    },
+    {
+      "id": "l2",
+      "role": "r2",
+      "startMs": 4300,
+      "endMs": 6600,
+      "text": {
+        "ru": "Закон джунглей на моей стороне.",
+        "en": "The law of the jungle is on my side."
+      }
+    },
+    {
+      "id": "l3",
+      "role": "r1",
+      "startMs": 7200,
+      "endMs": 10200,
+      "text": {
+        "ru": "Джунгли? Ты живёшь на диване.",
+        "en": "Jungle? You live on a couch."
+      },
+      "hint": "с издёвкой"
+    },
+    {
+      "id": "l4",
+      "role": "r2",
+      "startMs": 10800,
+      "endMs": 14200,
+      "text": {
+        "ru": "Это был очень дикий диван!",
+        "en": "It was a very wild couch!"
+      },
+      "hint": "обиженно"
+    }
+  ],
+  "sync": {
+    "leadInMs": 3000,
+    "videoAudioOffsetMs": 0
+  },
+  "source": {
+    "video": "source/original.mp4",
+    "bed": "source/bed.wav"
+  }
+}

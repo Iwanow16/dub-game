@@ -1,0 +1,87 @@
+{
+  "schema": "dubroom.clip/1",
+  "id": "c_detective001",
+  "slug": "detektiv-v-shlyape",
+  "version": 1,
+  "title": {
+    "ru": "Детектив в шляпе",
+    "en": "Detective in a Hat"
+  },
+  "durationMs": 17000,
+  "ageRating": "12+",
+  "tags": ["детектив", "нуар"],
+  "credit": "DubRoom starter pack (synthetic scene)",
+  "license": "CC0 1.0",
+  "roles": [
+    {
+      "id": "r1",
+      "name": {
+        "ru": "Детектив",
+        "en": "Detective"
+      },
+      "color": "#FF8A3D"
+    },
+    {
+      "id": "r2",
+      "name": {
+        "ru": "Свидетель",
+        "en": "Witness"
+      },
+      "color": "#3DA5FF"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "role": "r1",
+      "startMs": 1000,
+      "endMs": 4200,
+      "text": {
+        "ru": "Где вы были вчера в семь вечера?",
+        "en": "Where were you yesterday at seven?"
+      },
+      "hint": "медленно"
+    },
+    {
+      "id": "l2",
+      "role": "r2",
+      "startMs": 4700,
+      "endMs": 7000,
+      "text": {
+        "ru": "Я… ел суп. Один.",
+        "en": "I was… eating soup. Alone."
+      },
+      "hint": "нервно"
+    },
+    {
+      "id": "l3",
+      "role": "r1",
+      "startMs": 7600,
+      "endMs": 10600,
+      "text": {
+        "ru": "Суп был с фрикадельками?",
+        "en": "Did the soup have meatballs?"
+      },
+      "hint": "прищурившись"
+    },
+    {
+      "id": "l4",
+      "role": "r2",
+      "startMs": 11200,
+      "endMs": 15600,
+      "text": {
+        "ru": "Как вы узнали?! Вы гений!",
+        "en": "How did you know?! You're a genius!"
+      },
+      "hint": "восхищённо"
+    }
+  ],
+  "sync": {
+    "leadInMs": 3000,
+    "videoAudioOffsetMs": 0
+  },
+  "source": {
+    "video": "source/original.mp4",
+    "bed": "source/bed.wav"
+  }
+}

@@ -19,7 +19,9 @@ const HELP = `dubroom-clip — работа с пакетами клипов Dub
   dubroom-clip lines <dir> --from-srt <file> [--role-map roles.json] [--lang ru|en]
   dubroom-clip validate <dir>
   dubroom-clip build <dir> [--out <dir>]   локальная сборка пакета (как media-worker)
-  dubroom-clip publish <dir> --api <url> --key <STUDIO_KEY>
+  dubroom-clip publish <dir> --api <url> --key <STUDIO_KEY> [--wait] [--approve]
+                                           --wait: дождаться обработки; --approve: сразу опубликовать
+                                           (только для доверенного стартового набора)
 
 Переменные окружения: DUBROOM_API, STUDIO_KEY.
 `;
@@ -117,6 +119,8 @@ async function main(argv: string[]): Promise<number> {
       out: { type: "string" },
       api: { type: "string", default: process.env.DUBROOM_API },
       key: { type: "string", default: process.env.STUDIO_KEY },
+      wait: { type: "boolean", default: false },
+      approve: { type: "boolean", default: false },
     },
   });
 
@@ -284,7 +288,46 @@ async function main(argv: string[]): Promise<number> {
         log: (s) => console.log(`  · ${s}`),
       });
       console.log(`✓ отправлено на обработку, черновик ${draftId}. Статус — в Clip Studio.`);
-      return 0;
+      if (!values.wait && !values.approve) return 0;
+      const base = values.api.replace(/\/$/, "");
+      const headers = { authorization: `Bearer ${values.key}` };
+      for (;;) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const res = await fetch(`${base}/api/studio/drafts/${draftId}`, { headers });
+        const { draft } = (await res.json()) as {
+          draft: {
+            status: string;
+            clipId: string;
+            version: number;
+            errors: Issue[];
+            warnings: Issue[];
+          };
+        };
+        if (draft.status === "failed") {
+          console.error("✗ обработка не удалась");
+          printIssues(draft.errors, []);
+          return 1;
+        }
+        if (draft.status === "done") {
+          printIssues([], draft.warnings);
+          console.log(`✓ обработан: ${draft.clipId} v${draft.version} (статус review)`);
+          if (values.approve) {
+            const pub = await fetch(
+              `${base}/api/studio/clips/${draft.clipId}/versions/${draft.version}/publish`,
+              {
+                method: "POST",
+                headers,
+              },
+            );
+            if (!pub.ok) {
+              console.error(`✗ публикация: ${pub.status}`);
+              return 1;
+            }
+            console.log("✓ опубликован");
+          }
+          return 0;
+        }
+      }
     }
 
     default:
