@@ -39,6 +39,18 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.20.4)(tsx@4.23.15)
 
+  packages/clip-format:
+    dependencies:
+      '@dubroom/shared':
+        specifier: workspace:*
+        version: link:../shared
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      zod:
+        specifier: ^3.25.0
+        version: 3.25.76
+
   packages/shared:
     dependencies:
       zod:
