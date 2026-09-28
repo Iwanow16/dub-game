@@ -96,6 +96,7 @@ export interface PlayerPublic {
 }
 
 export interface DubTrack {
+  /** empty string while the room is anonymous and results are not revealed yet */
   playerId: string;
   dubId: string;
   offsetMs: number;
@@ -109,10 +110,10 @@ export interface DubTrack {
 /** One thing to watch and vote for: a single player's dub (classic) or a team (roles). */
 export interface Entry {
   id: string;
-  /** players credited for this entry */
+  /** players credited for this entry (empty while anonymous and not yet revealed) */
   playerIds: string[];
   tracks: DubTrack[];
-  /** true when at least one member's take never arrived */
+  /** true when no take of this entry arrived ("the recording got lost on the way", §13) */
   lost: boolean;
 }
 
@@ -127,6 +128,8 @@ export interface RoundResult {
 
 export interface RoundState {
   index: number; // 1-based
+  /** players taking part in this round (non-spectators at round start) */
+  participants: string[];
   candidates: CatalogEntry[];
   /** playerId → clipId */
   pickVotes: Record<string, string>;
@@ -142,6 +145,8 @@ export interface RoundState {
   results: RoundResult[] | null;
   /** number of votes cast so far (who voted for what stays secret until results) */
   votesCast: number;
+  /** personalized: the viewer's own entry (can't vote for it) */
+  myEntryId: string | null;
 }
 
 export interface RoomSnapshot {
