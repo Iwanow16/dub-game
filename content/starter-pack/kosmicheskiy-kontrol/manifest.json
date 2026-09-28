@@ -1,0 +1,86 @@
+{
+  "schema": "dubroom.clip/1",
+  "id": "c_spacecontrol",
+  "slug": "kosmicheskiy-kontrol",
+  "version": 1,
+  "title": {
+    "ru": "Космический контроль",
+    "en": "Mission Control"
+  },
+  "durationMs": 15000,
+  "ageRating": "12+",
+  "tags": ["космос", "пародия"],
+  "credit": "DubRoom starter pack (synthetic scene)",
+  "license": "CC0 1.0",
+  "roles": [
+    {
+      "id": "r1",
+      "name": {
+        "ru": "Капитан",
+        "en": "Captain"
+      },
+      "color": "#FF8A3D"
+    },
+    {
+      "id": "r2",
+      "name": {
+        "ru": "ЦУП",
+        "en": "Control"
+      },
+      "color": "#3DA5FF"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "role": "r2",
+      "startMs": 900,
+      "endMs": 3200,
+      "text": {
+        "ru": "Капитан, как слышите?",
+        "en": "Captain, do you copy?"
+      },
+      "hint": "по рации"
+    },
+    {
+      "id": "l2",
+      "role": "r1",
+      "startMs": 3700,
+      "endMs": 6600,
+      "text": {
+        "ru": "Слышу отлично. Вижу кота в скафандре.",
+        "en": "Loud and clear. I see a cat in a spacesuit."
+      }
+    },
+    {
+      "id": "l3",
+      "role": "r2",
+      "startMs": 7200,
+      "endMs": 9400,
+      "text": {
+        "ru": "Это не по протоколу.",
+        "en": "That's not in the protocol."
+      },
+      "hint": "строго"
+    },
+    {
+      "id": "l4",
+      "role": "r1",
+      "startMs": 10000,
+      "endMs": 13800,
+      "text": {
+        "ru": "Он говорит, что протокол — его.",
+        "en": "He says the protocol is his."
+      },
+      "hint": "растерянно"
+    }
+  ],
+  "sync": {
+    "leadInMs": 3000,
+    "videoAudioOffsetMs": 0
+  },
+  "source": {
+    "video": "source/original.mp4",
+    "bed": "source/bed.wav"
+  }
+}
