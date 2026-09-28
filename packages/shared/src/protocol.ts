@@ -36,7 +36,7 @@ export const C2SSchema = z.discriminatedUnion("t", [
   }),
   z.object({
     t: z.literal("dubUploaded"),
-    dubId: id,
+    receipt: z.string().min(10).max(1024),
     offsetMs: z.number().min(-5000).max(5000),
     effect: z.enum(EFFECTS),
     gain: z.number().min(0.1).max(10),

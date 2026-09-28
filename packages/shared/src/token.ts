@@ -110,7 +110,42 @@ export function verifyUploadTicket(ticket: string, keys: string[], now = Date.no
   return p && p.typ === "upload" ? p : null;
 }
 
-/** dubId layout: `<room>.<round>.<playerId>.<random>` — lets the game server check ownership. */
-export function dubBelongsTo(dubId: string, room: string, round: number, playerId: string) {
-  return dubId.startsWith(`${room}.${round}.${playerId}.`);
+/* ---------- dub receipts ---------- */
+
+/**
+ * Dub ids are opaque random strings, so a dub URL does not reveal its author (anonymous voting).
+ * The API returns a signed receipt binding the id to room/round/player; the game server verifies
+ * it before accepting `dubUploaded`.
+ */
+export const DUB_ID_RE = /^[A-Za-z0-9_-]{22}$/;
+
+export interface DubReceipt {
+  typ: "dub";
+  dub: string;
+  room: string;
+  round: number;
+  sub: string;
+  exp: number;
+}
+
+export function issueDubReceipt(
+  dubId: string,
+  ticket: Pick<UploadTicket, "room" | "round" | "sub">,
+  key: string,
+  now = Date.now(),
+): string {
+  const payload: DubReceipt = {
+    typ: "dub",
+    dub: dubId,
+    room: ticket.room,
+    round: ticket.round,
+    sub: ticket.sub,
+    exp: now + UPLOAD_TICKET_TTL_MS,
+  };
+  return sign(payload, key);
+}
+
+export function verifyDubReceipt(receipt: string, keys: string[], now = Date.now()) {
+  const p = verify<DubReceipt>(receipt, keys, now);
+  return p && p.typ === "dub" && DUB_ID_RE.test(p.dub) ? p : null;
 }
