@@ -5,6 +5,10 @@ import {
   assignTeams,
   containsProfanity,
   estimateOffset,
+  expandPlayables,
+  maxAttempts,
+  maxDubBytes,
+  recordPhaseMs,
   generateRoomCode,
   nextHost,
   normalizeRoomCode,
@@ -48,6 +52,7 @@ const clip = (
   manifestUrl: `/media/clips/${id}/v1/manifest.json`,
   posterUrl: "",
   previewUrl: null,
+  scenes: [],
 });
 
 const entry = (id: string, playerIds: string[], lost = false): Entry => ({
@@ -165,7 +170,10 @@ describe("teams (roles mode)", () => {
 });
 
 describe("clip picking", () => {
-  const catalog = [clip("a"), clip("b", 2), clip("c", 3, "16+"), clip("d")];
+  const catalog = expandPlayables(
+    [clip("a"), clip("b", 2), clip("c", 3, "16+"), clip("d")],
+    "scene",
+  );
   it("filters by age rating and prefers multi-role clips in roles mode", () => {
     const c = pickCandidates(catalog, { mode: "roles", maxAgeRating: "12+" }, new Set(), 3);
     expect(c.map((x) => x.id)).toEqual(["b"]);
@@ -177,9 +185,84 @@ describe("clip picking", () => {
     expect(c.map((x) => x.id).sort()).toEqual(["b", "d"]);
   });
   it("resolves the majority vote", () => {
-    const cands = [clip("a"), clip("b"), clip("c")];
+    const cands = expandPlayables([clip("a"), clip("b"), clip("c")], "full");
     expect(resolvePick(cands, { p1: "b", p2: "b", p3: "a" })?.id).toBe("b");
     expect(resolvePick([], {})).toBeNull();
+  });
+});
+
+describe("long clips", () => {
+  const series = {
+    ...clip("series", 3),
+    durationMs: 20 * 60_000,
+    scenes: [
+      {
+        id: "s1",
+        startMs: 0,
+        endMs: 40_000,
+        rolesCount: 2,
+        roleIds: ["r1", "r2"],
+        posterUrl: "/p1",
+      },
+      {
+        id: "s2",
+        startMs: 40_000,
+        endMs: 95_000,
+        rolesCount: 1,
+        roleIds: ["r3"],
+        posterUrl: "/p2",
+      },
+    ],
+  };
+  it("plays scenes in scene mode and the whole clip in full mode", () => {
+    const scenes = expandPlayables([series, clip("short")], "scene");
+    expect(scenes.map((p) => p.id)).toEqual(["series#s1", "series#s2", "short"]);
+    expect(scenes[1]).toMatchObject({
+      clipId: "series",
+      durationMs: 55_000,
+      rolesCount: 1,
+      sceneIndex: 2,
+      sceneCount: 2,
+      posterUrl: "/p2",
+    });
+    const full = expandPlayables([series], "full");
+    expect(full).toHaveLength(1);
+    expect(full[0]).toMatchObject({ id: "series", scene: null, durationMs: 20 * 60_000 });
+  });
+  it("prefers candidates from different clips", () => {
+    const many = {
+      ...series,
+      id: "many",
+      scenes: Array.from({ length: 10 }, (_, i) => ({
+        id: `s${i + 1}`,
+        startMs: i * 30_000,
+        endMs: (i + 1) * 30_000,
+        rolesCount: 1,
+        roleIds: ["r1"],
+        posterUrl: "",
+      })),
+    };
+    const pool = expandPlayables([many, clip("x"), clip("y")], "scene");
+    const picked = pickCandidates(pool, { mode: "classic", maxAgeRating: "16+" }, new Set(), 3);
+    expect(new Set(picked.map((p) => p.clipId)).size).toBe(3);
+    // with a single clip there are still three candidates (different scenes)
+    expect(
+      pickCandidates(
+        expandPlayables([many], "scene"),
+        { mode: "classic", maxAgeRating: "16+" },
+        new Set(),
+        3,
+      ),
+    ).toHaveLength(3);
+  });
+  it("scales attempts, record phase and upload cap with length", () => {
+    expect(maxAttempts(30_000)).toBe(2);
+    expect(maxAttempts(10 * 60_000)).toBe(1);
+    // 10-minute clip: 1 attempt, no rehearsal → ~10 + 3 + 600 + 30 s
+    expect(recordPhaseMs(600_000, false)).toBe(10_000 + 3_000 + 600_000 + 30_000);
+    expect(recordPhaseMs(20_000, false)).toBe(10_000 + 20_000 + 2 * 23_000 + 30_000);
+    expect(maxDubBytes(30_000)).toBe(2 * 1024 * 1024);
+    expect(maxDubBytes(20 * 60_000)).toBeGreaterThan(6 * 1024 * 1024);
   });
 });
 
@@ -228,12 +311,13 @@ describe("tokens", () => {
   it("signs and verifies, rejects tampering and expiry", () => {
     const t = sign({ a: 1, exp: Date.now() + 1000 }, key);
     expect(verify(t, [key])).toMatchObject({ a: 1 });
-    expect(
-      verify(
-        t.replace(/.$/, (c) => (c === "A" ? "B" : "A")),
-        [key],
-      ),
-    ).toBeNull();
+    // tamper with the payload — flipping the last signature char may only touch base64 padding bits
+    const [, sig] = t.split(".");
+    const forged = Buffer.from(JSON.stringify({ a: 2, exp: Date.now() + 1000 })).toString(
+      "base64url",
+    );
+    expect(verify(`${forged}.${sig}`, [key])).toBeNull();
+    expect(verify(`${t.split(".")[0]}.${sig!.slice(0, 10)}`, [key])).toBeNull();
     expect(verify(t, ["other"])).toBeNull();
     expect(verify(sign({ exp: 1 }, key), [key])).toBeNull();
   });
@@ -242,8 +326,13 @@ describe("tokens", () => {
     expect(verifyGuestToken(token, ["new", "old"])?.sub).toBe("p1");
   });
   it("upload tickets are not guest tokens", () => {
-    const { ticket } = issueUploadTicket("ABCDE", 2, "p1", key);
-    expect(verifyUploadTicket(ticket, [key])).toMatchObject({ room: "ABCDE", round: 2, sub: "p1" });
+    const { ticket } = issueUploadTicket("ABCDE", 2, "p1", key, { maxBytes: 5_000_000 });
+    expect(verifyUploadTicket(ticket, [key])).toMatchObject({
+      room: "ABCDE",
+      round: 2,
+      sub: "p1",
+      max: 5_000_000,
+    });
     expect(verifyGuestToken(ticket, [key])).toBeNull();
     const receipt = issueDubReceipt("a".repeat(22), { room: "ABCDE", round: 2, sub: "p1" }, key);
     expect(verifyDubReceipt(receipt, [key])).toMatchObject({ dub: "a".repeat(22), sub: "p1" });

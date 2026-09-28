@@ -18,7 +18,10 @@ export interface ApiConfig {
   /** trust CF-Connecting-IP (only behind cloudflared + caddy, §21.7) */
   trustCfIp: boolean;
   dubTtlMs: number;
-  dubMaxBytes: number;
+  /** absolute cap for one take; the upload ticket carries the per-clip limit (ADR-0009) */
+  dubHardMaxBytes: number;
+  /** longest clip the Studio accepts (CLIP_MAX_MINUTES) */
+  clipMaxMs: number;
   serveMedia: boolean;
 }
 
@@ -41,7 +44,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
         : null,
     trustCfIp: env.TRUST_CF_CONNECTING_IP === "true",
     dubTtlMs: Number(env.DUB_TTL_HOURS ?? 24) * 3600_000,
-    dubMaxBytes: 2 * 1024 * 1024,
+    dubHardMaxBytes: Number(env.DUB_MAX_MB ?? 64) * 1024 * 1024,
+    clipMaxMs: Number(env.CLIP_MAX_MINUTES ?? 180) * 60_000,
     serveMedia: env.SERVE_MEDIA !== "false",
   };
 }

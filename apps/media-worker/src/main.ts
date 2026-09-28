@@ -22,6 +22,7 @@ log("started", { dataDir });
 await runWorker(db, {
   dataDir,
   jobTimeoutMs: Number(process.env.JOB_TIMEOUT_MIN ?? 10) * 60_000,
+  maxDurationMs: Number(process.env.CLIP_MAX_MINUTES ?? 180) * 60_000,
   pollMs: Number(process.env.POLL_MS ?? 2000),
   signal: controller.signal,
   log,

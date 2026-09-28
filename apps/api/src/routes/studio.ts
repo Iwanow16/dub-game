@@ -7,6 +7,7 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 import { z } from "zod";
 import { validateManifest, type ClipManifest } from "@dubroom/clip-format";
 import { DbError, type SourceKind } from "@dubroom/db";
+import { sign, verify } from "@dubroom/shared/token";
 
 const KINDS: SourceKind[] = ["video", "bed", "dialogue"];
 /** Max source size (§9.2): 2 GB, uploaded in ≤ 50 MB chunks. */
@@ -29,6 +30,7 @@ export function draftDir(dataDir: string, draftId: string) {
  */
 export async function studioRoutes(app: FastifyInstance) {
   const { config, db, catalog } = app.deps;
+  const limits = { maxDurationMs: config.clipMaxMs };
   const jwks = config.cfAccess
     ? createRemoteJWKSet(new URL(`https://${config.cfAccess.teamDomain}/cdn-cgi/access/certs`))
     : null;
@@ -37,9 +39,22 @@ export async function studioRoutes(app: FastifyInstance) {
     if (config.studioHost && req.hostname !== config.studioHost) {
       return reply.status(404).send({ error: "not_found" });
     }
+    // <video>/<audio> can't send headers: media of a draft may be fetched with a short-lived
+    // signed link instead (GET /drafts/:id/media-link), still behind Cloudflare Access
+    const mediaLink = /^\/api\/studio\/drafts\/([\w-]+)\/source\/(proxy|peaks)\?t=([\w.-]+)$/.exec(
+      req.url,
+    );
+    let linkOk = false;
+    if (mediaLink) {
+      const t = verify<{ typ: string; draft: string; exp: number }>(
+        mediaLink[3]!,
+        config.signingKeys,
+      );
+      linkOk = t?.typ === "studio-media" && t.draft === mediaLink[1];
+    }
     const auth = req.headers.authorization ?? "";
     const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-    if (!key || !safeEqual(key, config.studioKey)) {
+    if (!linkOk && (!key || !safeEqual(key, config.studioKey))) {
       return reply.status(401).send({ error: "unauthorized" });
     }
     if (jwks && config.cfAccess) {
@@ -79,7 +94,7 @@ export async function studioRoutes(app: FastifyInstance) {
     const body = z.object({ manifest: z.unknown() }).safeParse(req.body);
     if (!body.success) return reply.status(400).send({ error: "bad_request" });
     // structural check only — content checks run on submit
-    const v = validateManifest(body.data.manifest);
+    const v = validateManifest(body.data.manifest, limits);
     const schemaErrors = v.errors.filter((e) => e.code === "schema");
     if (schemaErrors.length)
       return reply.status(400).send({ error: "invalid_manifest", issues: schemaErrors });
@@ -95,7 +110,7 @@ export async function studioRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>("/drafts/:id", async (req, reply) => {
     const d = db.getDraft(req.params.id);
     return d
-      ? { draft: d, check: validateManifest(d.manifest) }
+      ? { draft: d, check: validateManifest(d.manifest, limits) }
       : reply.status(404).send({ error: "not_found" });
   });
 
@@ -108,14 +123,14 @@ export async function studioRoutes(app: FastifyInstance) {
       if (d.status !== "draft" && d.status !== "failed")
         return reply.status(409).send({ error: "bad_state" });
       const body = z.object({ manifest: z.unknown() }).safeParse(req.body);
-      const v = validateManifest(body.success ? body.data.manifest : null);
+      const v = validateManifest(body.success ? body.data.manifest : null, limits);
       if (!v.manifest)
         return reply.status(400).send({ error: "invalid_manifest", issues: v.errors });
       const updated = db.updateDraft(d.id, {
         manifest: v.manifest as ClipManifest,
         status: "draft",
       });
-      return { draft: updated, check: validateManifest(updated.manifest) };
+      return { draft: updated, check: validateManifest(updated.manifest, limits) };
     },
   );
 
@@ -180,22 +195,45 @@ export async function studioRoutes(app: FastifyInstance) {
     return { received };
   });
 
+  /** Signed link for streaming a long source's proxy in a <video> element (6 h). */
+  app.get<{ Params: { id: string } }>("/drafts/:id/media-link", async (req, reply) => {
+    const d = db.getDraft(req.params.id);
+    if (!d) return reply.status(404).send({ error: "not_found" });
+    const t = sign(
+      { typ: "studio-media", draft: d.id, exp: Date.now() + 6 * 3600_000 },
+      config.signingKeys[0]!,
+    );
+    return {
+      proxy: `/api/studio/drafts/${d.id}/source/proxy?t=${t}`,
+      peaks: `/api/studio/drafts/${d.id}/source/peaks?t=${t}`,
+    };
+  });
+
   /** Streams an uploaded source or its editing proxy (with Range) for markup in the Studio. */
   app.get<{ Params: { id: string; kind: string } }>(
     "/drafts/:id/source/:kind",
     async (req, reply) => {
       const d = db.getDraft(req.params.id);
-      // "proxy" = browser-safe WebM made by the media worker for editing
-      const kind = req.params.kind as SourceKind | "proxy";
-      if (!d || ![...KINDS, "proxy"].includes(kind)) {
+      // "proxy" = browser-safe WebM made by the media worker for editing, "peaks" = its waveform
+      const kind = req.params.kind as SourceKind | "proxy" | "peaks";
+      if (!d || ![...KINDS, "proxy", "peaks"].includes(kind)) {
         return reply.status(404).send({ error: "not_found" });
       }
-      const file = join(draftDir(config.dataDir, d.id), kind === "proxy" ? "proxy.webm" : kind);
+      const name = kind === "proxy" ? "proxy.webm" : kind === "peaks" ? "peaks.bin" : kind;
+      const file = join(draftDir(config.dataDir, d.id), name);
       if (!existsSync(file)) return reply.status(404).send({ error: "not_found" });
       const size = (await stat(file)).size;
       reply.header("accept-ranges", "bytes");
       reply.header("cache-control", "no-store");
-      reply.type(kind === "proxy" ? "video/webm" : kind === "video" ? "video/mp4" : "audio/wav");
+      reply.type(
+        kind === "proxy"
+          ? "video/webm"
+          : kind === "peaks"
+            ? "application/octet-stream"
+            : kind === "video"
+              ? "video/mp4"
+              : "audio/wav",
+      );
       const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
       if (range) {
         const start = range[1] ? Number(range[1]) : 0;
@@ -230,7 +268,7 @@ export async function studioRoutes(app: FastifyInstance) {
       if (f && f.received !== f.size) return reply.status(400).send({ error: `${k}_incomplete` });
     }
     // duration is re-measured by the worker from the real file; here check everything else
-    const check = validateManifest(d.manifest);
+    const check = validateManifest(d.manifest, limits);
     const blocking = check.errors.filter((e) => e.code !== "duration" && e.code !== "line_bounds");
     if (blocking.length)
       return reply.status(400).send({ error: "invalid_manifest", issues: blocking });

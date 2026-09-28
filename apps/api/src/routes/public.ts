@@ -80,7 +80,7 @@ export async function publicRoutes(app: FastifyInstance) {
   app.post(
     "/api/dubs",
     {
-      bodyLimit: config.dubMaxBytes,
+      bodyLimit: config.dubHardMaxBytes,
       config: { rateLimit: { max: 20, timeWindow: "1 minute" } },
     },
     async (req, reply) => {
@@ -91,7 +91,10 @@ export async function publicRoutes(app: FastifyInstance) {
       const body = req.body;
       if (!Buffer.isBuffer(body) || body.length === 0)
         return reply.status(400).send({ error: "empty" });
-      if (body.length > config.dubMaxBytes) return reply.status(413).send({ error: "too_large" });
+      // longer clips allow longer takes: the game server puts the limit into the ticket
+      if (body.length > Math.min(ticket.max, config.dubHardMaxBytes)) {
+        return reply.status(413).send({ error: "too_large" });
+      }
       const kind = sniffAudio(body);
       if (!kind) return reply.status(415).send({ error: "unsupported_media" });
 

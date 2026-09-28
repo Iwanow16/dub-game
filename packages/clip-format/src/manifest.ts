@@ -38,6 +38,28 @@ export const MediaSchema = z.object({
   subtitles: z.record(z.string()).optional(),
 });
 
+/* Scenes of long clips (ADR-0009) — see scenes.ts for the rules and auto-splitting. */
+const SceneMediaFile = z.object({
+  url: z.string().min(1),
+  bytes: z.number().int().nonnegative(),
+  codec: z.string(),
+});
+
+export const SceneMediaSchema = z.object({
+  video: z.array(SceneMediaFile.extend({ height: z.number().int().positive() })).min(1),
+  bed: z.array(SceneMediaFile).min(1),
+  poster: z.string(),
+});
+
+export const SceneSchema = z.object({
+  id: z.string().regex(/^s\d{1,4}$/, "scene id must look like s1, s2 …"),
+  startMs: z.number().int().min(0),
+  endMs: z.number().int().min(0),
+  title: LocalizedTextSchema.optional(),
+  /** set by the media worker */
+  media: SceneMediaSchema.optional(),
+});
+
 export const ManifestSchema = z.object({
   schema: z.literal(MANIFEST_SCHEMA),
   id: z.string().regex(/^c_[a-z0-9]{6,32}$/),
@@ -63,6 +85,8 @@ export const ManifestSchema = z.object({
     })
     .optional(),
   media: MediaSchema.optional(),
+  /** long clips are played one scene per round; empty/absent = the clip is one scene */
+  scenes: z.array(SceneSchema).max(5000).optional(),
   sync: z.object({
     leadInMs: z.number().int().min(0).max(10_000),
     videoAudioOffsetMs: z.number().int().min(-1000).max(1000),
@@ -74,6 +98,8 @@ export type ClipManifest = z.infer<typeof ManifestSchema>;
 export type ClipRole = z.infer<typeof RoleSchema>;
 export type ClipLine = z.infer<typeof LineSchema>;
 export type ClipMedia = z.infer<typeof MediaSchema>;
+export type ClipScene = z.infer<typeof SceneSchema>;
+export type SceneMedia = z.infer<typeof SceneMediaSchema>;
 
 /** Six colour-blind-distinguishable role colours (§20.4). */
 export const ROLE_COLORS = ["#FF8A3D", "#3DA5FF", "#3DDC97", "#FF6FB5", "#FFC23D", "#B37BFF"];
