@@ -1,0 +1,16 @@
+{
+  "name": "@dubroom/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@dubroom/clip-format": "workspace:*",
+    "@dubroom/shared": "workspace:*"
+  }
+}
