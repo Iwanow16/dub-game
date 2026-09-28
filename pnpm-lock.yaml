@@ -73,6 +73,15 @@ importers:
         specifier: ^4.23.15
         version: 4.23.15
 
+  apps/media-worker:
+    dependencies:
+      '@dubroom/clip-format':
+        specifier: workspace:*
+        version: link:../../packages/clip-format
+      '@dubroom/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+
   packages/clip-format:
     dependencies:
       '@dubroom/shared':
