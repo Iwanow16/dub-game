@@ -1,0 +1,30 @@
+# deps & builds
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# runtime data
+/data/
+/.data/
+*.log
+
+# secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+infra/cloudflared/*.json
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# test artifacts
+playwright-report/
+test-results/
