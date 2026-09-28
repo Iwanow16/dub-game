@@ -1,0 +1,105 @@
+{
+  "schema": "dubroom.clip/1",
+  "id": "c_knightcheese1",
+  "slug": "rytsar-i-syr",
+  "version": 1,
+  "title": {
+    "ru": "Рыцарь и сыр",
+    "en": "The Knight and the Cheese"
+  },
+  "durationMs": 18000,
+  "ageRating": "0+",
+  "tags": ["фэнтези", "комедия"],
+  "credit": "DubRoom starter pack (synthetic scene)",
+  "license": "CC0 1.0",
+  "roles": [
+    {
+      "id": "r1",
+      "name": {
+        "ru": "Рыцарь",
+        "en": "Knight"
+      },
+      "color": "#FF8A3D"
+    },
+    {
+      "id": "r2",
+      "name": {
+        "ru": "Дракон",
+        "en": "Dragon"
+      },
+      "color": "#3DA5FF"
+    },
+    {
+      "id": "r3",
+      "name": {
+        "ru": "Сыр",
+        "en": "Cheese"
+      },
+      "color": "#3DDC97"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "role": "r1",
+      "startMs": 1000,
+      "endMs": 3500,
+      "text": {
+        "ru": "Отдай сыр, чудовище!",
+        "en": "Give me the cheese, monster!"
+      },
+      "hint": "грозно"
+    },
+    {
+      "id": "l2",
+      "role": "r2",
+      "startMs": 4000,
+      "endMs": 6800,
+      "text": {
+        "ru": "Это не сыр. Это моя подушка.",
+        "en": "It's not cheese. It's my pillow."
+      },
+      "hint": "сонно"
+    },
+    {
+      "id": "l3",
+      "role": "r3",
+      "startMs": 7300,
+      "endMs": 9500,
+      "text": {
+        "ru": "Вообще-то я тут, если что.",
+        "en": "Excuse me, I'm right here."
+      },
+      "hint": "тоненько"
+    },
+    {
+      "id": "l4",
+      "role": "r1",
+      "startMs": 10200,
+      "endMs": 13000,
+      "text": {
+        "ru": "Сыр разговаривает?!",
+        "en": "The cheese talks?!"
+      },
+      "hint": "в ужасе"
+    },
+    {
+      "id": "l5",
+      "role": "r2",
+      "startMs": 13500,
+      "endMs": 16800,
+      "text": {
+        "ru": "Он ещё и поёт по вечерам.",
+        "en": "It sings in the evenings, too."
+      }
+    }
+  ],
+  "sync": {
+    "leadInMs": 3000,
+    "videoAudioOffsetMs": 0
+  },
+  "source": {
+    "video": "source/original.mp4",
+    "bed": "source/bed.wav"
+  }
+}

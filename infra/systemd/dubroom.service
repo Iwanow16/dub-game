@@ -1,0 +1,18 @@
+# Autostart after reboot (§21.4). Installed by scripts/setup.sh.
+[Unit]
+Description=DubRoom (docker compose stack)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/dubroom
+ExecStart=/opt/dubroom/scripts/start.sh --yes
+ExecStop=/opt/dubroom/scripts/stop.sh --yes
+TimeoutStartSec=15min
+TimeoutStopSec=6min
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,67 @@
+{
+  "schema": "dubroom.clip/1",
+  "id": "c_morningnews01",
+  "slug": "utrenniy-efir",
+  "version": 1,
+  "title": {
+    "ru": "Утренний эфир",
+    "en": "Morning Show"
+  },
+  "durationMs": 14000,
+  "ageRating": "0+",
+  "tags": ["новости", "пародия"],
+  "credit": "DubRoom starter pack (synthetic scene)",
+  "license": "CC0 1.0",
+  "roles": [
+    {
+      "id": "r1",
+      "name": {
+        "ru": "Ведущий",
+        "en": "Host"
+      },
+      "color": "#FF8A3D"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "role": "r1",
+      "startMs": 800,
+      "endMs": 3400,
+      "text": {
+        "ru": "Доброе утро! В эфире новости, которых не было.",
+        "en": "Good morning! Here's news that never happened."
+      },
+      "hint": "бодро"
+    },
+    {
+      "id": "l2",
+      "role": "r1",
+      "startMs": 4000,
+      "endMs": 7400,
+      "text": {
+        "ru": "Сегодня в городе ожидается дождь из пельменей.",
+        "en": "Today the city expects a rain of dumplings."
+      }
+    },
+    {
+      "id": "l3",
+      "role": "r1",
+      "startMs": 8000,
+      "endMs": 12600,
+      "text": {
+        "ru": "Синоптики советуют взять сметану.",
+        "en": "Forecasters recommend bringing sour cream."
+      },
+      "hint": "серьёзно"
+    }
+  ],
+  "sync": {
+    "leadInMs": 3000,
+    "videoAudioOffsetMs": 0
+  },
+  "source": {
+    "video": "source/original.mp4",
+    "bed": "source/bed.wav"
+  }
+}

@@ -28,3 +28,12 @@ infra/cloudflared/*.json
 # test artifacts
 playwright-report/
 test-results/
+
+# generated clip sources/builds
+content/**/source/
+content/**/dist/
+
+# e2e
+e2e/fake-voice.wav
+infra/cloudflared/config.yml
+infra/cloudflared/cert.pem

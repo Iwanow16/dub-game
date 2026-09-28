@@ -1,0 +1,14 @@
+{
+  "name": "@dubroom/help",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "check": "node build.mjs --check"
+  },
+  "dependencies": {
+    "marked": "^16.4.2"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "DubRoom",
+  "short_name": "DubRoom",
+  "description": "Переозвучь кино с друзьями прямо в браузере",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12121A",
+  "theme_color": "#12121A",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
