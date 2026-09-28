@@ -91,6 +91,11 @@ test("three players play a full round", async ({ browser }) => {
     timeout: 30_000,
   });
   await host.screenshot({ path: `${SHOTS}/10-results.png` });
+  // complaint about the clip reaches moderation (§14)
+  await others[0]!.getByRole("button", { name: "⚑ Пожаловаться" }).click();
+  await others[0]!.getByLabel("Что не так?").fill("E2E: проверка жалобы");
+  await others[0]!.getByRole("button", { name: "Отправить" }).click();
+  await expect(others[0]!.getByText("Спасибо, модераторы посмотрят")).toBeVisible();
   const total = await host.locator(".dr-score__pts").allInnerTexts();
   expect(total.join(" ")).toMatch(/[1-9]\d{2}/); // somebody scored ≥ 100
 

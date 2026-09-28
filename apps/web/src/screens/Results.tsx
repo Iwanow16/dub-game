@@ -4,6 +4,7 @@ import { ReactionBar, Scoreboard } from "@dubroom/ui";
 import { game } from "../net/client.ts";
 import { sounds } from "../lib/audio.ts";
 import { useT } from "../lib/i18n.ts";
+import { ReportButton } from "../components/ReportButton.tsx";
 
 export function Results({ room }: { room: RoomSnapshot }) {
   const t = useT();
@@ -42,6 +43,9 @@ export function Results({ room }: { room: RoomSnapshot }) {
       </h2>
       {audience && <p>👏 {t("results.audience", { name: nameOf(audience.entryId) })}</p>}
       <Scoreboard rows={rows} />
+      <div className="row">
+        <ReportButton room={room} />
+      </div>
       <ReactionBar
         emojis={REACTIONS}
         onReact={(emoji) =>
