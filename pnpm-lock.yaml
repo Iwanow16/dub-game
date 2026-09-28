@@ -101,6 +101,43 @@ importers:
         specifier: workspace:*
         version: link:../../packages/db
 
+  apps/studio:
+    dependencies:
+      '@dubroom/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
+      '@dubroom/clip-format':
+        specifier: workspace:*
+        version: link:../../packages/clip-format
+      '@dubroom/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@dubroom/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      react:
+        specifier: ^19.3.0
+        version: 19.3.0
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.0(react@19.3.0)
+      zustand:
+        specifier: ^5.0.15
+        version: 5.0.15(@types/react@19.3.0)(react@19.3.0)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^5.2.0
+        version: 5.2.0(vite@7.3.6(@types/node@22.20.4)(tsx@4.23.15))
+      vite:
+        specifier: ^7.3.6
+        version: 7.3.6(@types/node@22.20.4)(tsx@4.23.15)
+
   apps/web:
     dependencies:
       '@dubroom/audio':
