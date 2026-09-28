@@ -40,6 +40,8 @@ services:
       CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
       TRUST_CF_CONNECTING_IP: "true"
       SERVE_MEDIA: "false"
+      CLIP_MAX_MINUTES: ${CLIP_MAX_MINUTES:-180}
+      DUB_MAX_MB: ${DUB_MAX_MB:-64}
       LOG_LEVEL: ${LOG_LEVEL:-info}
     networks: [backend]
     healthcheck:
@@ -79,6 +81,7 @@ services:
     network_mode: none
     environment:
       JOB_TIMEOUT_MIN: ${JOB_TIMEOUT_MIN:-10}
+      CLIP_MAX_MINUTES: ${CLIP_MAX_MINUTES:-180}
     deploy:
       resources: { limits: { cpus: "${WORKER_CPUS:-2.0}", memory: 2G } }
 

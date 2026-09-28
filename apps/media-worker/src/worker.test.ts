@@ -61,6 +61,8 @@ describe.skipIf(!hasFfmpeg)("media worker", () => {
     );
     expect(db.getDraft(draft.id)).toMatchObject({ proxyStatus: "done", sourceDurationMs: 6000 });
     expect(existsSync(join(up, "proxy.webm"))).toBe(true);
+    // 6 s of silence-free bed? the synthetic video has no audio → empty peaks file
+    expect(existsSync(join(up, "peaks.bin"))).toBe(true);
 
     const claimed = db.claimQueuedDraft()!;
     expect(await processDraft(db, claimed, { dataDir: dir, jobTimeoutMs: 120_000, log })).toBe(

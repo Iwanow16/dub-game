@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { AvatarSpec } from "./avatar.ts";
-import type { CatalogEntry } from "./catalog.ts";
+import type { Playable } from "./catalog.ts";
 
 export const MAX_PLAYERS = 6;
 export const MAX_SPECTATORS = 20;
@@ -32,6 +32,8 @@ export const RoomSettingsSchema = z.object({
   relaxedTimers: z.boolean(),
   /** FR-1: reject new joins while a game is running (spectators still allowed). */
   locked: z.boolean(),
+  /** long clips: play one scene per round, or the whole clip */
+  segment: z.enum(["scene", "full"]),
 });
 export type RoomSettings = z.infer<typeof RoomSettingsSchema>;
 
@@ -43,6 +45,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   clipPick: "vote",
   relaxedTimers: false,
   locked: false,
+  segment: "scene",
 };
 
 export type Phase =
@@ -69,10 +72,40 @@ export const PHASE_MS = {
   review: 30_000,
 } as const;
 
-/** Record phase = load + rehearsal + 2 attempts × (countdown + clip) + review. */
+/** Longer takes get one attempt and no rehearsal — otherwise a round never ends. */
+export const LONG_TAKE_MS = 180_000;
+/** Above this, clients stream media instead of preloading and decoding it into memory. */
+export const STREAM_THRESHOLD_MS = 120_000;
+
+export function maxAttempts(clipMs: number): number {
+  return clipMs > LONG_TAKE_MS ? 1 : 2;
+}
+
+export function rehearsalAllowed(clipMs: number): boolean {
+  return clipMs <= LONG_TAKE_MS;
+}
+
+/** Record phase = load + rehearsal + attempts × (countdown + clip) + review. */
 export function recordPhaseMs(clipMs: number, relaxed: boolean): number {
-  const base = PHASE_MS.load + clipMs + 2 * (PHASE_MS.countdown + clipMs) + PHASE_MS.review;
+  const rehearsal = rehearsalAllowed(clipMs) ? clipMs : 0;
+  const base =
+    PHASE_MS.load +
+    rehearsal +
+    maxAttempts(clipMs) * (PHASE_MS.countdown + clipMs) +
+    PHASE_MS.review;
   return relaxed ? base * 3 : base;
+}
+
+/** Recording bitrate: long takes use less so they stay small (Opus voice is fine at 32 kbit/s). */
+export function recordingBitrate(clipMs: number): number {
+  return clipMs > STREAM_THRESHOLD_MS ? 32_000 : 48_000;
+}
+
+/** Upload cap for a take of a clip of this length (§14: 2 MB for normal clips). */
+export function maxDubBytes(clipMs: number): number {
+  const seconds = (clipMs + PHASE_MS.countdown + 5_000) / 1000;
+  const estimate = Math.ceil(seconds * (recordingBitrate(clipMs) / 8) * 1.5);
+  return Math.max(2 * 1024 * 1024, estimate);
 }
 
 export function timerMs(ms: number, relaxed: boolean): number {
@@ -130,10 +163,10 @@ export interface RoundState {
   index: number; // 1-based
   /** players taking part in this round (non-spectators at round start) */
   participants: string[];
-  candidates: CatalogEntry[];
+  candidates: Playable[];
   /** playerId → clipId */
   pickVotes: Record<string, string>;
-  clip: CatalogEntry | null;
+  clip: Playable | null;
   /** roles mode: playerId → roleIds */
   roleAssignment: Record<string, string[]>;
   /** roles mode: team index per player */
@@ -158,7 +191,7 @@ export interface RoomSnapshot {
   players: PlayerPublic[];
   round: RoundState | null;
   /** best entry of the whole game, for "rewatch" on the final screen */
-  bestOfGame: { round: number; clip: CatalogEntry; entry: Entry; votes: number } | null;
+  bestOfGame: { round: number; clip: Playable; entry: Entry; votes: number } | null;
 }
 
 /* ---------- pure game rules (unit-tested) ---------- */
@@ -244,15 +277,18 @@ export function assignTeams(
   return { teams, assignment };
 }
 
-/** Picks up to `n` random candidates, preferring clips that fit the mode and rating. */
+/**
+ * Picks up to `n` random candidates, preferring ones that fit the mode and rating, haven't been
+ * played, and come from different clips (so three scenes of one series don't crowd the choice).
+ */
 export function pickCandidates(
-  catalog: CatalogEntry[],
+  playables: Playable[],
   settings: Pick<RoomSettings, "mode" | "maxAgeRating">,
   exclude: Set<string>,
   n: number,
   rand: () => number = Math.random,
-): CatalogEntry[] {
-  const allowed = catalog.filter((c) => ageRatingAllowed(c.ageRating, settings.maxAgeRating));
+): Playable[] {
+  const allowed = playables.filter((c) => ageRatingAllowed(c.ageRating, settings.maxAgeRating));
   const byMode = settings.mode === "roles" ? allowed.filter((c) => c.rolesCount >= 2) : allowed;
   const pools = [
     byMode.filter((c) => !exclude.has(c.id)),
@@ -266,15 +302,24 @@ export function pickCandidates(
     const j = Math.floor(rand() * (i + 1));
     [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
   }
-  return shuffled.slice(0, n);
+  const picked: Playable[] = [];
+  const clips = new Set<string>();
+  for (const c of shuffled) {
+    if (picked.length < n && !clips.has(c.clipId)) {
+      picked.push(c);
+      clips.add(c.clipId);
+    }
+  }
+  for (const c of shuffled) if (picked.length < n && !picked.includes(c)) picked.push(c);
+  return picked;
 }
 
 /** Majority of pick votes; ties and "no votes" are resolved randomly. */
 export function resolvePick(
-  candidates: CatalogEntry[],
+  candidates: Playable[],
   votes: Record<string, string>,
   rand: () => number = Math.random,
-): CatalogEntry | null {
+): Playable | null {
   if (candidates.length === 0) return null;
   const counts = new Map<string, number>(candidates.map((c) => [c.id, 0]));
   for (const clipId of Object.values(votes)) {

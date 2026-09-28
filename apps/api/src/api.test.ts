@@ -96,6 +96,22 @@ describe("dubs", () => {
     expect(get.rawPayload.length).toBe(204);
   });
 
+  it("lets long clips upload longer takes, up to the ticket's limit", async () => {
+    const pid = randomUUID();
+    const long = Buffer.concat([webm(), Buffer.alloc(5 * 1024 * 1024)]);
+    const small = issueUploadTicket("ABCDE", 1, pid, KEY).ticket;
+    const big = issueUploadTicket("ABCDE", 1, pid, KEY, { maxBytes: 8 * 1024 * 1024 }).ticket;
+    const up = (ticket: string) =>
+      app.inject({
+        method: "POST",
+        url: "/api/dubs",
+        headers: { "x-upload-ticket": ticket, "content-type": "audio/webm" },
+        payload: long,
+      });
+    expect((await up(small)).statusCode).toBe(413);
+    expect((await up(big)).statusCode).toBe(200);
+  });
+
   it("rejects missing tickets, wrong formats and oversized files", async () => {
     const { ticket } = issueUploadTicket("ABCDE", 1, randomUUID(), KEY);
     const noTicket = await app.inject({
@@ -181,6 +197,24 @@ describe("studio", () => {
     expect(status.json()).toMatchObject({ received: 600, size: 1000 });
     expect((await put(600, data.subarray(600))).json()).toEqual({ received: 1000 });
     expect(db.getDraft(draftId)!.proxyStatus).toBe("queued");
+
+    // signed media link: streams without the Authorization header, only for this draft
+    const link = (
+      await app.inject({
+        method: "GET",
+        url: `/api/studio/drafts/${draftId}/media-link`,
+        headers: auth,
+      })
+    ).json() as { proxy: string };
+    expect((await app.inject({ method: "GET", url: link.proxy })).statusCode).toBe(404); // no proxy file yet, but authorized
+    expect(
+      (await app.inject({ method: "GET", url: link.proxy.replace(/t=.*/, "t=forged.sig") }))
+        .statusCode,
+    ).toBe(401);
+    expect(
+      (await app.inject({ method: "GET", url: `/api/studio/drafts/${draftId}/source/video` }))
+        .statusCode,
+    ).toBe(401);
 
     const ranged = await app.inject({
       method: "GET",

@@ -90,18 +90,29 @@ export interface UploadTicket {
   room: string;
   round: number;
   sub: string;
+  /** max accepted size in bytes — longer clips allow longer takes */
+  max: number;
   exp: number;
 }
+
+export const DEFAULT_DUB_MAX_BYTES = 2 * 1024 * 1024;
 
 export function issueUploadTicket(
   room: string,
   round: number,
   playerId: string,
   key: string,
-  ttlMs = UPLOAD_TICKET_TTL_MS,
-  now = Date.now(),
+  opts: { ttlMs?: number; maxBytes?: number; now?: number } = {},
 ) {
-  const payload: UploadTicket = { typ: "upload", room, round, sub: playerId, exp: now + ttlMs };
+  const now = opts.now ?? Date.now();
+  const payload: UploadTicket = {
+    typ: "upload",
+    room,
+    round,
+    sub: playerId,
+    max: opts.maxBytes ?? DEFAULT_DUB_MAX_BYTES,
+    exp: now + (opts.ttlMs ?? UPLOAD_TICKET_TTL_MS),
+  };
   return { ticket: sign(payload, key), expiresAt: payload.exp };
 }
 

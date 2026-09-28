@@ -116,8 +116,8 @@ export class GameServer {
     while (this.rooms.has(code));
     const room = new Room(code, {
       catalog: this.cfg.catalog,
-      issueTicket: (roomCode, round, playerId, ttl) =>
-        issueUploadTicket(roomCode, round, playerId, this.cfg.signingKeys[0]!, ttl).ticket,
+      issueTicket: (roomCode, round, playerId, opts) =>
+        issueUploadTicket(roomCode, round, playerId, this.cfg.signingKeys[0]!, opts).ticket,
       verifyReceipt: (r) => verifyDubReceipt(r, this.cfg.signingKeys),
       onEmpty: (r) => this.dropRoom(r.code),
       log: this.cfg.log,

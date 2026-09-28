@@ -15,6 +15,8 @@ import {
   uniquifyName,
   type AvatarSpec,
   type C2S,
+  expandPlayables,
+  maxDubBytes,
   type CatalogEntry,
   type DubTrack,
   type EffectId,
@@ -36,7 +38,12 @@ export interface Conn {
 
 export interface RoomDeps {
   catalog: () => Promise<CatalogEntry[]>;
-  issueTicket: (room: string, round: number, playerId: string, ttlMs: number) => string;
+  issueTicket: (
+    room: string,
+    round: number,
+    playerId: string,
+    opts: { ttlMs: number; maxBytes: number },
+  ) => string;
   verifyReceipt: (
     receipt: string,
   ) => { dub: string; room: string; round: number; sub: string } | null;
@@ -95,7 +102,8 @@ export class Room {
   private banned = new Set<string>();
   private hostId: string | null = null;
   private round: RoundInternal | null = null;
-  private playedClips = new Set<string>();
+  /** playable ids (clip or clip#scene) already played in this room */
+  private played = new Set<string>();
   private bestOfGame: RoomSnapshot["bestOfGame"] = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private v = 0;
@@ -446,7 +454,8 @@ export class Room {
 
   private async startRound(index: number) {
     const catalog = await this.deps.catalog().catch(() => [] as CatalogEntry[]);
-    const candidates = pickCandidates(catalog, this.settings, this.playedClips, 3, this.rand);
+    const playables = expandPlayables(catalog, this.settings.segment);
+    const candidates = pickCandidates(playables, this.settings, this.played, 3, this.rand);
     if (candidates.length === 0) {
       this.send({ t: "error", code: "not_allowed", message: "в библиотеке нет подходящих клипов" });
       this.setPhase("lobby", null);
@@ -479,9 +488,11 @@ export class Room {
     const r = this.round!;
     r.clip = resolvePick(r.candidates, r.pickVotes, this.rand);
     if (!r.clip) return;
-    this.playedClips.add(r.clip.id);
+    this.played.add(r.clip.id);
     if (this.settings.mode === "roles") {
-      const roleIds = Array.from({ length: Math.max(1, r.clip.rolesCount) }, (_, i) => `r${i + 1}`);
+      const roleIds = r.clip.scene?.roleIds.length
+        ? r.clip.scene.roleIds
+        : Array.from({ length: Math.max(1, r.clip.rolesCount) }, (_, i) => `r${i + 1}`);
       const { teams, assignment } = assignTeams(r.participants, roleIds);
       r.teams = teams;
       r.roleAssignment = assignment;
@@ -498,7 +509,10 @@ export class Room {
   private sendTicket(m: Member) {
     if (!this.round || this.endsAt == null) return;
     const ttl = Math.max(60_000, this.endsAt - this.now() + 5 * 60_000);
-    const ticket = this.deps.issueTicket(this.code, this.round.index, m.id, ttl);
+    const ticket = this.deps.issueTicket(this.code, this.round.index, m.id, {
+      ttlMs: ttl,
+      maxBytes: maxDubBytes(this.round.clip?.durationMs ?? 0),
+    });
     for (const c of m.conns) {
       c.send({ t: "uploadTicket", ticket, round: this.round.index, expiresAt: this.now() + ttl });
     }

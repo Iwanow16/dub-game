@@ -21,6 +21,7 @@ const clip = (id: string, rolesCount = 1): CatalogEntry => ({
   manifestUrl: "",
   posterUrl: "",
   previewUrl: null,
+  scenes: [],
 });
 
 class FakeConn implements Conn {
@@ -319,6 +320,77 @@ describe("a full game", () => {
     s = conns.get("p1")!.state!;
     expect(s.round!.entries).toHaveLength(2);
     expect(s.round!.entries.every((e) => e.tracks.length === 2)).toBe(true);
+  });
+});
+
+describe("long clips", () => {
+  const series = {
+    ...clip("series", 3),
+    durationMs: 30 * 60_000,
+    scenes: [
+      {
+        id: "s1",
+        startMs: 0,
+        endMs: 40_000,
+        rolesCount: 2,
+        roleIds: ["r2", "r3"],
+        posterUrl: "/p1",
+      },
+      {
+        id: "s2",
+        startMs: 40_000,
+        endMs: 90_000,
+        rolesCount: 2,
+        roleIds: ["r1", "r3"],
+        posterUrl: "/p2",
+      },
+    ],
+  };
+
+  it("plays a scene per round and deals the scene's own roles", async () => {
+    room.dispose();
+    const tickets: { maxBytes: number }[] = [];
+    room = new Room("ABCDE", {
+      catalog: async () => [series],
+      issueTicket: (_r, _round, pid, opts) => (tickets.push(opts), `ticket:${pid}`),
+      verifyReceipt: () => null,
+      rand: () => 0.1,
+    });
+    for (const p of ["p1", "p2"]) join(p, `Игрок ${p}`);
+    act("p1", { t: "settings", settings: { mode: "roles", clipPick: "host" } });
+    act("p1", { t: "start" });
+    await flush();
+    const cands = conns.get("p1")!.state!.round!.candidates;
+    expect(cands.every((c) => c.id.startsWith("series#") && c.scene !== null)).toBe(true);
+    act("p1", { t: "pickClip", clipId: cands[0]!.id });
+    const s = conns.get("p1")!.state!;
+    expect(s.round!.clip!.durationMs).toBeLessThanOrEqual(50_000);
+    const dealt = Object.values(s.round!.roleAssignment).flat().sort();
+    expect(dealt).toEqual(
+      [...s.round!.clip!.scene!.roleIds, ...s.round!.clip!.scene!.roleIds].sort(),
+    );
+    expect(tickets[0]!.maxBytes).toBe(2 * 1024 * 1024);
+  });
+
+  it("plays the whole clip in full mode, with a bigger upload limit", async () => {
+    room.dispose();
+    const tickets: { maxBytes: number }[] = [];
+    room = new Room("ABCDE", {
+      catalog: async () => [series],
+      issueTicket: (_r, _round, pid, opts) => (tickets.push(opts), `ticket:${pid}`),
+      verifyReceipt: () => null,
+      rand: () => 0.1,
+    });
+    for (const p of ["p1", "p2"]) join(p, `Игрок ${p}`);
+    act("p1", { t: "settings", settings: { segment: "full", clipPick: "host" } });
+    act("p1", { t: "start" });
+    await flush();
+    act("p1", { t: "pickClip", clipId: "series" });
+    const s = conns.get("p1")!.state!;
+    expect(s.round!.clip).toMatchObject({ id: "series", scene: null, durationMs: 30 * 60_000 });
+    expect(tickets[0]!.maxBytes).toBeGreaterThan(6 * 1024 * 1024);
+    // one attempt, no rehearsal: ~30 min + a minute of slack, not 90 min
+    expect(s.endsAt! - Date.now()).toBeLessThan(32 * 60_000);
   });
 });
 

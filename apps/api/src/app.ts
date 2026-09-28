@@ -75,7 +75,7 @@ export async function buildApp(config: ApiConfig, db: Db): Promise<FastifyInstan
   // raw bodies for uploads (dubs, studio chunks) — parsed as Buffer, size limited per route
   app.addContentTypeParser(
     ["application/octet-stream", "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "video/mp4"],
-    { parseAs: "buffer", bodyLimit: 60 * 1024 * 1024 },
+    { parseAs: "buffer", bodyLimit: Math.max(60 * 1024 * 1024, config.dubHardMaxBytes) },
     (_req, body, done) => done(null, body),
   );
 
