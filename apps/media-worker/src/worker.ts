@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { Issue } from "@dubroom/clip-format";
-import { BuildError, buildPackage } from "@dubroom/clip-format/node";
+import { BuildError, buildPackage, buildProxy } from "@dubroom/clip-format/node";
 import type { Db, Draft } from "@dubroom/db";
 
 export interface WorkerOptions {
@@ -62,6 +62,31 @@ export async function processDraft(db: Db, draft: Draft, opts: WorkerOptions): P
   }
 }
 
+/** Browser-safe editing proxy for Clip Studio (uploads/<draft>/proxy.webm). */
+export async function processProxy(db: Db, draft: Draft, opts: WorkerOptions): Promise<boolean> {
+  const dir = join(opts.dataDir, "uploads", draft.id);
+  const out = join(dir, "proxy.webm");
+  const tmp = join(dir, `proxy.tmp-${process.pid}.webm`);
+  try {
+    const r = await buildProxy(join(dir, "video"), tmp, { timeoutMs: opts.jobTimeoutMs });
+    await rename(tmp, out);
+    db.finishProxy(draft.id, { durationMs: r.durationMs });
+    opts.log("proxy done", { draft: draft.id, durationMs: r.durationMs });
+    return true;
+  } catch (e) {
+    await rm(tmp, { force: true });
+    const message =
+      e instanceof BuildError && e.issues.length
+        ? e.issues.map((i) => i.message).join("; ")
+        : e instanceof Error
+          ? e.message.slice(0, 500)
+          : String(e);
+    db.finishProxy(draft.id, { error: message });
+    opts.log("proxy failed", { draft: draft.id, error: message });
+    return false;
+  }
+}
+
 /** Polling loop; SQLite gives atomic claiming, so several workers may run side by side. */
 export async function runWorker(
   db: Db,
@@ -72,6 +97,11 @@ export async function runWorker(
     const draft = db.claimQueuedDraft();
     if (draft) {
       await processDraft(db, draft, opts);
+      continue;
+    }
+    const proxy = db.claimProxyJob();
+    if (proxy) {
+      await processProxy(db, proxy, opts);
       continue;
     }
     await new Promise((r) => setTimeout(r, opts.pollMs));

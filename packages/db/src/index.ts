@@ -22,6 +22,8 @@ export interface DraftFile {
   received: number;
 }
 
+export type ProxyStatus = "none" | "queued" | "processing" | "done" | "failed";
+
 export interface Draft {
   id: string;
   clipId: string;
@@ -32,6 +34,9 @@ export interface Draft {
   warnings: Issue[];
   errors: Issue[];
   progress: number;
+  proxyStatus: ProxyStatus;
+  /** measured by the worker with ffprobe */
+  sourceDurationMs: number | null;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
@@ -121,6 +126,10 @@ const MIGRATIONS: string[] = [
      created_at INTEGER NOT NULL,
      resolved_at INTEGER
    );`,
+  // 2: editing proxy for Clip Studio (browser-safe preview of the source)
+  `ALTER TABLE drafts ADD COLUMN proxy_status TEXT NOT NULL DEFAULT 'none';
+   ALTER TABLE drafts ADD COLUMN source_duration_ms INTEGER;
+   CREATE INDEX drafts_proxy ON drafts(proxy_status);`,
 ];
 
 type Row = Record<string, unknown>;
@@ -262,6 +271,8 @@ export class Db {
       warnings: json(r.warnings_json, []),
       errors: json(r.errors_json, []),
       progress: Number(r.progress),
+      proxyStatus: String(r.proxy_status ?? "none") as ProxyStatus,
+      sourceDurationMs: r.source_duration_ms == null ? null : Number(r.source_duration_ms),
       createdBy: String(r.created_by),
       createdAt: Number(r.created_at),
       updatedAt: Number(r.updated_at),
@@ -372,11 +383,47 @@ export class Db {
     });
   }
 
+  /* ---------- editing proxy ---------- */
+
+  requestProxy(id: string) {
+    this.sql
+      .prepare("UPDATE drafts SET proxy_status = 'queued', source_duration_ms = NULL WHERE id = ?")
+      .run(id);
+  }
+
+  claimProxyJob(): Draft | null {
+    return this.tx(() => {
+      const r = this.sql
+        .prepare("SELECT id FROM drafts WHERE proxy_status = 'queued' ORDER BY updated_at LIMIT 1")
+        .get() as Row | undefined;
+      if (!r) return null;
+      this.sql
+        .prepare("UPDATE drafts SET proxy_status = 'processing' WHERE id = ?")
+        .run(String(r.id));
+      return this.getDraft(String(r.id));
+    });
+  }
+
+  finishProxy(id: string, result: { durationMs: number } | { error: string }) {
+    if ("durationMs" in result) {
+      this.sql
+        .prepare("UPDATE drafts SET proxy_status = 'done', source_duration_ms = ? WHERE id = ?")
+        .run(result.durationMs, id);
+    } else {
+      this.sql
+        .prepare("UPDATE drafts SET proxy_status = 'failed', errors_json = ? WHERE id = ?")
+        .run(JSON.stringify([{ code: "proxy", path: "source.video", message: result.error }]), id);
+    }
+  }
+
   /** Drafts stuck in "processing" (worker crashed) go back to the queue. */
   requeueStale(olderThanMs: number) {
     this.sql
       .prepare("UPDATE drafts SET status = 'queued' WHERE status = 'processing' AND updated_at < ?")
       .run(Date.now() - olderThanMs);
+    this.sql
+      .prepare("UPDATE drafts SET proxy_status = 'queued' WHERE proxy_status = 'processing'")
+      .run();
   }
 
   finishProcessing(

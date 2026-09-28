@@ -64,8 +64,23 @@ export function loadManifest(manifestUrl: string): Promise<Manifest> {
  * Quality rule (§11.4): the best rung that downloads within half of the pick phase (~10 s),
  * `saveData` → lowest, manual override in settings.
  */
+export function videoMime(v: { codec: string; url: string }): string {
+  return v.url.endsWith(".webm")
+    ? `video/webm; codecs="${v.codec}"`
+    : `video/mp4; codecs="${v.codec}"`;
+}
+
+let probeEl: HTMLVideoElement | null = null;
+/** Rungs this browser can decode; H.264 first (hardware decoding), VP9 WebM as the fallback. */
+export function playableRungs(m: Manifest): Manifest["media"]["video"] {
+  probeEl ??= document.createElement("video");
+  const ok = m.media.video.filter((v) => probeEl!.canPlayType(videoMime(v)) !== "");
+  const h264 = ok.filter((v) => v.codec.startsWith("avc1"));
+  return h264.length ? h264 : ok.length ? ok : m.media.video;
+}
+
 export function chooseVideo(m: Manifest): Manifest["media"]["video"][number] {
-  const ladder = [...m.media.video].sort((a, b) => b.height - a.height);
+  const ladder = [...playableRungs(m)].sort((a, b) => b.height - a.height);
   const pref = usePrefs.getState().quality;
   if (pref !== "auto") return ladder.find((v) => v.height <= pref) ?? ladder[ladder.length - 1]!;
   const conn = (
@@ -170,9 +185,8 @@ export function preloadCandidates(entries: CatalogEntry[]) {
     loadManifest(e.manifestUrl)
       .then((m) => {
         const base = baseOf(e.manifestUrl);
-        const medium = [...m.media.video].sort((a, b) => a.height - b.height)[
-          Math.min(1, m.media.video.length - 1)
-        ]!;
+        const rungs = [...playableRungs(m)].sort((a, b) => a.height - b.height);
+        const medium = rungs[Math.min(1, rungs.length - 1)]!;
         const init: RequestInit & { priority?: string } = {
           headers: { range: "bytes=0-524287" },
           priority: "low",

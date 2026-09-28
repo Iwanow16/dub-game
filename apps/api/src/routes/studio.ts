@@ -138,7 +138,7 @@ export async function studioRoutes(app: FastifyInstance) {
 
   app.put<{
     Params: { id: string; kind: string };
-    Querystring: { offset?: string; total?: string; name?: string };
+    Querystring: { offset?: string; total?: string; name?: string; proxy?: string };
   }>("/drafts/:id/files/:kind", { bodyLimit: MAX_CHUNK_BYTES }, async (req, reply) => {
     const d = db.getDraft(req.params.id);
     const kind = req.params.kind as SourceKind;
@@ -174,22 +174,28 @@ export async function studioRoutes(app: FastifyInstance) {
     const received = offset + chunk.length;
     const files = { ...d.files, [kind]: { name: req.query.name ?? kind, size: total, received } };
     db.updateDraft(d.id, { files });
+    // a complete source video gets a browser-safe editing proxy from the media worker
+    // (the CLI submits right away and opts out with ?proxy=0)
+    if (kind === "video" && received === total && req.query.proxy !== "0") db.requestProxy(d.id);
     return { received };
   });
 
-  /** Streams an uploaded source (with Range) so the Studio can mark up lines on it. */
+  /** Streams an uploaded source or its editing proxy (with Range) for markup in the Studio. */
   app.get<{ Params: { id: string; kind: string } }>(
     "/drafts/:id/source/:kind",
     async (req, reply) => {
       const d = db.getDraft(req.params.id);
-      const kind = req.params.kind as SourceKind;
-      if (!d || !KINDS.includes(kind)) return reply.status(404).send({ error: "not_found" });
-      const file = join(draftDir(config.dataDir, d.id), kind);
+      // "proxy" = browser-safe WebM made by the media worker for editing
+      const kind = req.params.kind as SourceKind | "proxy";
+      if (!d || ![...KINDS, "proxy"].includes(kind)) {
+        return reply.status(404).send({ error: "not_found" });
+      }
+      const file = join(draftDir(config.dataDir, d.id), kind === "proxy" ? "proxy.webm" : kind);
       if (!existsSync(file)) return reply.status(404).send({ error: "not_found" });
       const size = (await stat(file)).size;
       reply.header("accept-ranges", "bytes");
       reply.header("cache-control", "no-store");
-      reply.type(kind === "video" ? "video/mp4" : "audio/wav");
+      reply.type(kind === "proxy" ? "video/webm" : kind === "video" ? "video/mp4" : "audio/wav");
       const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
       if (range) {
         const start = range[1] ? Number(range[1]) : 0;

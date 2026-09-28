@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { decode } from "@dubroom/audio";
 import type { ClipVersion } from "./api.ts";
 import { audioCtx } from "./audio.ts";
@@ -14,7 +14,18 @@ export function PackagePreview({ version }: { version: ClipVersion }) {
   const [pos, setPos] = useState(-1);
   const [bed, setBed] = useState<AudioBuffer | null>(null);
   const base = `/media/clips/${version.clipId}/v${version.version}/`;
-  const rung = m?.media?.video.find((v) => v.height === 480) ?? m?.media?.video[0];
+  const rung = useMemo(() => {
+    const el = document.createElement("video");
+    const ok = (m?.media?.video ?? []).filter(
+      (v) =>
+        el.canPlayType(
+          v.url.endsWith(".webm")
+            ? `video/webm; codecs="${v.codec}"`
+            : `video/mp4; codecs="${v.codec}"`,
+        ) !== "",
+    );
+    return ok.find((v) => v.height === 480) ?? ok[0] ?? m?.media?.video[0];
+  }, [m]);
   const opus = m?.media?.bed.find((b) => b.codec === "opus") ?? m?.media?.bed[0];
 
   useEffect(() => {
