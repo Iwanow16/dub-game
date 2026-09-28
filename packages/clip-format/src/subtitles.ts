@@ -15,7 +15,7 @@ function parseTimestamp(ts: string): number {
 
 export function parseSrt(src: string): SrtCue[] {
   const blocks = src
-    .replace(/^﻿/, "")
+    .replace(/^\uFEFF/, "")
     .replace(/\r\n?/g, "\n")
     .trim()
     .split(/\n{2,}/);
