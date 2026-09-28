@@ -1,0 +1,10 @@
+# Tunnel mode B (locally managed, §21.3/§21.6). scripts/tunnel.sh create writes config.yml and the
+# credentials file next to it; both are git-ignored.
+tunnel: dubroom
+credentials-file: /etc/cloudflared/dubroom.json
+ingress:
+  - hostname: play.example.com
+    service: http://caddy:8080
+  - hostname: studio.example.com
+    service: http://caddy:8080
+  - service: http_status:404

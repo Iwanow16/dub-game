@@ -1,0 +1,12 @@
+# DubRoom scheduled jobs (§21.4, §22.11). Installed to /etc/cron.d/dubroom by setup.sh.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# nightly backup
+10 4 * * * root /opt/dubroom/scripts/backup.sh --quiet >>/var/log/dubroom-backup.log 2>&1
+# health check with alerts
+*/5 * * * * root /opt/dubroom/scripts/status.sh --quiet --notify >/dev/null 2>&1
+# weekly security audit report (Monday 05:20)
+20 5 * * 1 root /opt/dubroom/scripts/security-check.sh --notify >>/var/log/dubroom-security.log 2>&1
+# drop the previous token signing key once its 24 h grace period is over
+30 * * * * root /opt/dubroom/scripts/rotate-secrets.sh --yes >/dev/null 2>&1

@@ -5,7 +5,10 @@
 set -Eeuo pipefail
 
 DUBROOM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# scripts run from an installation (or a checkout with its own .env) operate on that directory
+if [[ -z ${INSTALL_DIR:-} && -f $DUBROOM_ROOT/.env ]]; then INSTALL_DIR=$DUBROOM_ROOT; fi
 INSTALL_DIR="${INSTALL_DIR:-/opt/dubroom}"
+ENV_FILE="${INSTALL_DIR}/.env"
 ASSUME_YES="${ASSUME_YES:-0}"
 
 if [[ -t 1 ]]; then
@@ -32,7 +35,7 @@ on_error() {
 trap 'on_error $LINENO' ERR
 
 require_root() {
-  [[ ${EUID} -eq 0 ]] || die "запустите с sudo: sudo $0 $*"
+  [[ ${EUID} -eq 0 ]] || die "запустите с sudo: sudo $0"
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -96,8 +99,42 @@ env_set() {
   rm -f "$tmp"
 }
 
+# Loads .env into the environment (for scripts that need its values).
+load_env() {
+  [[ -r $ENV_FILE ]] || die "нет $ENV_FILE — сначала запустите scripts/setup.sh"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+}
+
+# docker compose with the project's files; adds the tunnel profile and, for local-only or quick
+# tunnel setups, the loopback port binding (infra/docker-compose.local.yml).
 compose() {
-  docker compose --project-directory "${INSTALL_DIR}" -f "${INSTALL_DIR}/infra/docker-compose.yml" --env-file "${INSTALL_DIR}/.env" "$@"
+  local mode files=(-f "${INSTALL_DIR}/infra/docker-compose.yml")
+  mode=$(env_get "$ENV_FILE" TUNNEL_MODE)
+  if [[ $mode == none || $mode == quick || $(env_get "$ENV_FILE" LOCAL_ACCESS) == 1 ]]; then
+    files+=(-f "${INSTALL_DIR}/infra/docker-compose.local.yml")
+  fi
+  local profile=()
+  [[ -n $mode && $mode != none ]] && profile=(--profile tunnel)
+  docker compose --project-directory "${INSTALL_DIR}" "${files[@]}" --env-file "$ENV_FILE" "${profile[@]}" "$@"
+}
+
+# notify "text" — Telegram and/or e-mail if configured in .env (status.sh --notify, §22.11)
+notify() {
+  local text token chat mail
+  text="[DubRoom $(hostname)] $1"
+  token=$(env_get "$ENV_FILE" NOTIFY_TELEGRAM_TOKEN)
+  chat=$(env_get "$ENV_FILE" NOTIFY_TELEGRAM_CHAT)
+  mail=$(env_get "$ENV_FILE" NOTIFY_EMAIL)
+  if [[ -n $token && -n $chat ]]; then
+    curl -fsS -m 10 "https://api.telegram.org/bot${token}/sendMessage" \
+      --data-urlencode "chat_id=${chat}" --data-urlencode "text=${text}" >/dev/null || warn "telegram: не отправлено"
+  fi
+  if [[ -n $mail ]] && have mail; then
+    printf '%s\n' "$text" | mail -s "DubRoom: $(hostname)" "$mail" || warn "почта: не отправлено"
+  fi
 }
 
 # wait_http URL [timeout_s]

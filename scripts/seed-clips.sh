@@ -27,14 +27,27 @@ done
 [[ -n $DIR && -d $DIR ]] || die "укажите каталог с клипами (например content/starter-pack)"
 
 # pick up config of a local install or dev env
-for f in "$INSTALL_DIR/.env" "$DUBROOM_ROOT/.env.dev"; do
+for f in "$ENV_FILE" "$DUBROOM_ROOT/.env.dev"; do
   if [[ -z ${STUDIO_KEY:-} && -r $f ]]; then STUDIO_KEY=$(env_get "$f" STUDIO_KEY); fi
 done
-DUBROOM_API=${DUBROOM_API:-http://localhost:3000}
 [[ -n ${STUDIO_KEY:-} ]] || die "STUDIO_KEY не задан"
-need node curl
 
-CLI=("node" "$DUBROOM_ROOT/packages/clip-format/bin/dubroom-clip.mjs")
+# On a server without Node/FFmpeg on the host, run inside the app container (same network as the
+# API; the clip folder is mounted read-only and copied to a scratch dir there).
+if [[ ! -f /.dockerenv && -f $ENV_FILE ]] && ! { have node && have ffmpeg; }; then
+  need docker
+  abs=$(cd "$DIR" && pwd)
+  args=(/app/scripts/seed-clips.sh /import)
+  [[ $APPROVE == 1 ]] && args+=(--approve)
+  [[ $FORCE == 1 ]] && args+=(--force)
+  exec docker compose --project-directory "$INSTALL_DIR" -f "$INSTALL_DIR/infra/docker-compose.yml" --env-file "$ENV_FILE" \
+    run --rm --no-deps -e STUDIO_KEY="$STUDIO_KEY" -e DUBROOM_API=http://api:3000 -v "$abs:/import:ro" \
+    --entrypoint bash api "${args[@]}"
+fi
+
+DUBROOM_API=${DUBROOM_API:-http://localhost:3000}
+need node curl
+read -r -a CLI <<<"${DUBROOM_CLI:-node $DUBROOM_ROOT/packages/clip-format/bin/dubroom-clip.mjs}"
 catalog=$(curl -fsS "$DUBROOM_API/api/catalog" || die "API недоступен: $DUBROOM_API")
 
 count=0
@@ -48,6 +61,12 @@ for clip in "$DIR"/*/; do
     continue
   fi
   step "$name"
+  if [[ ! -w $clip ]]; then
+    # read-only source (container mount): work on a scratch copy
+    scratch=$(mktemp -d)
+    cp -r "$clip" "$scratch/"
+    clip="$scratch/$name"
+  fi
   if [[ ! -f $clip/source/original.mp4 && -f $clip/synth.json ]]; then
     "${CLI[@]}" synth "$clip" >/dev/null
     ok "исходник сгенерирован"
