@@ -122,11 +122,10 @@ class GameClient {
         useGame.setState({ room: msg.room });
         break;
       case "phase": {
-        const room = useGame.getState().room;
+        // the full snapshot (with the new round) follows right after; only reset per-phase bits
         const patch: Partial<ReturnType<typeof useGame.getState>> = {};
         if (msg.phase === "vote" || msg.phase === "pick") patch.myVote = null;
         if (msg.phase !== "watch") patch.playAt = null;
-        if (room) patch.room = { ...room, phase: msg.phase, endsAt: msg.endsAt };
         useGame.setState(patch);
         break;
       }

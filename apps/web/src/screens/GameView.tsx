@@ -33,6 +33,8 @@ export function GameView() {
 }
 
 function PhaseScreen({ room }: { room: RoomSnapshot }) {
+  if (room.phase !== "lobby" && room.phase !== "final" && !room.round)
+    return <div className="spinner" />;
   switch (room.phase) {
     case "lobby":
       return <Lobby room={room} />;
