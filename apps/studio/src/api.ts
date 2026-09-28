@@ -12,6 +12,8 @@ export interface Draft {
   warnings: Issue[];
   errors: Issue[];
   progress: number;
+  proxyStatus: "none" | "queued" | "processing" | "done" | "failed";
+  sourceDurationMs: number | null;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
@@ -115,7 +117,7 @@ export const api = {
   resolveReport: (id: string) => call(`/reports/${id}/resolve`, { method: "POST" }),
 
   /** Fetches an uploaded source (needs the auth header, so no plain <video src>). */
-  async sourceBlob(id: string, kind: SourceKind): Promise<Blob> {
+  async sourceBlob(id: string, kind: SourceKind | "proxy"): Promise<Blob> {
     const res = await fetch(`/api/studio/drafts/${id}/source/${kind}`, {
       headers: { authorization: `Bearer ${getKey()}` },
     });

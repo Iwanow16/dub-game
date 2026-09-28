@@ -85,13 +85,23 @@ export function NewClip() {
     if (!ready || !files.video) return;
     setBusy(true);
     try {
-      const probe = await probeDuration(files.video);
+      // the browser may not decode the source (HEVC, MKV…) — then the worker's ffprobe measures it
+      const probe = await probeDuration(files.video).catch(() => {
+        toast(
+          {
+            text: "Браузер не может показать это видео — Studio сделает превью, это займёт минуту",
+            kind: "info",
+          },
+          6000,
+        );
+        return { durationMs: 0, height: 0 };
+      });
       if (probe.height && probe.height < 480)
         toast({ text: `Разрешение ${probe.height}p — нужно ≥ 480p`, kind: "error" });
       const manifest = emptyManifest({
         slug: slug || slugify(title),
         title: { ru: title.trim() },
-        durationMs: probe.durationMs,
+        durationMs: probe.durationMs || 1000,
         credit: credit.trim(),
         license: lic,
         ageRating: rating,
@@ -100,7 +110,9 @@ export function NewClip() {
           .map((t) => t.trim())
           .filter(Boolean)
           .slice(0, 10),
-        source: { trimStartMs: 0, trimEndMs: probe.durationMs },
+        source: probe.durationMs
+          ? { trimStartMs: 0, trimEndMs: probe.durationMs }
+          : { trimStartMs: 0 },
       });
       const { draftId } = await api.createDraft(manifest);
       for (const kind of ["video", "bed", "dialogue"] as const) {

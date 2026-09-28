@@ -180,6 +180,7 @@ describe("studio", () => {
     });
     expect(status.json()).toMatchObject({ received: 600, size: 1000 });
     expect((await put(600, data.subarray(600))).json()).toEqual({ received: 1000 });
+    expect(db.getDraft(draftId)!.proxyStatus).toBe("queued");
 
     const ranged = await app.inject({
       method: "GET",

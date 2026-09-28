@@ -70,6 +70,11 @@ test("three players play a full round", async ({ browser }) => {
   // watch — synchronized playback of 3 takes
   await expect(host.getByText(/Дубль 1 из 3/)).toBeVisible({ timeout: 30_000 });
   await host.waitForTimeout(4000);
+  // the clip really plays (not just the poster): video time advances
+  const t1 = await host.locator(".stage__video").evaluate((v: HTMLVideoElement) => v.currentTime);
+  await host.waitForTimeout(1000);
+  const t2 = await host.locator(".stage__video").evaluate((v: HTMLVideoElement) => v.currentTime);
+  expect(t2).toBeGreaterThan(t1);
   await host.screenshot({ path: `${SHOTS}/08-watch.png` });
 
   // vote — each player votes for the first take that isn't theirs

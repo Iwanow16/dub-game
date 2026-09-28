@@ -8,7 +8,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { emptyManifest } from "@dubroom/clip-format";
 import { synthesizeSource } from "@dubroom/clip-format/node";
 import { Db } from "@dubroom/db";
-import { processDraft } from "./worker.ts";
+import { processDraft, processProxy } from "./worker.ts";
 
 const hasFfmpeg = (() => {
   try {
@@ -54,6 +54,14 @@ describe.skipIf(!hasFfmpeg)("media worker", () => {
     });
 
     const log = () => {};
+    db.requestProxy(draft.id);
+    const proxyJob = db.claimProxyJob()!;
+    expect(await processProxy(db, proxyJob, { dataDir: dir, jobTimeoutMs: 60_000, log })).toBe(
+      true,
+    );
+    expect(db.getDraft(draft.id)).toMatchObject({ proxyStatus: "done", sourceDurationMs: 6000 });
+    expect(existsSync(join(up, "proxy.webm"))).toBe(true);
+
     const claimed = db.claimQueuedDraft()!;
     expect(await processDraft(db, claimed, { dataDir: dir, jobTimeoutMs: 120_000, log })).toBe(
       true,

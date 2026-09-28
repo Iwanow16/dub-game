@@ -23,3 +23,22 @@ export function probeDuration(file: Blob): Promise<{ durationMs: number; height:
     v.src = url;
   });
 }
+
+/** Can this browser decode the file? (HEVC .mov, some MKV and — in some builds — H.264 can't.) */
+export function canPlay(url: string, timeoutMs = 6000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const v = document.createElement("video");
+    const done = (ok: boolean) => {
+      clearTimeout(timer);
+      v.removeAttribute("src");
+      v.load();
+      resolve(ok);
+    };
+    const timer = setTimeout(() => done(false), timeoutMs);
+    v.preload = "auto";
+    v.muted = true;
+    v.onloadeddata = () => done(v.videoWidth > 0);
+    v.onerror = () => done(false);
+    v.src = url;
+  });
+}

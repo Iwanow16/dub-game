@@ -12,7 +12,7 @@ import { AGE_RATINGS, type AgeRating } from "@dubroom/shared";
 import { Button, useToast } from "@dubroom/ui";
 import { ApiError, api, uploadSource, type Draft, type SourceKind } from "./api.ts";
 import { audioCtx } from "./audio.ts";
-import { localFiles, setLocalFile } from "./localFiles.ts";
+import { canPlay, localFiles, setLocalFile } from "./localFiles.ts";
 import { Waveform } from "./Waveform.tsx";
 import { SubtitleOverlay } from "./SubtitleOverlay.tsx";
 import { IssueList } from "./IssueList.tsx";
@@ -54,37 +54,100 @@ export function Editor({ draftId }: { draftId: string }) {
   const clipDuration = Math.max(0, trimEnd - trimStart);
   const clipPos = srcPos - trimStart;
 
-  // load draft + media
+  const [media, setMedia] = useState<"loading" | "ready" | "proxy-wait" | "failed">("loading");
+
+  // load the draft
   useEffect(() => {
     let alive = true;
-    api.draft(draftId).then(async ({ draft: d }) => {
+    api.draft(draftId).then(({ draft: d }) => {
       if (!alive) return;
       setDraft(d);
       setM(d.manifest);
       if (d.status !== "draft" && d.status !== "failed") setStep("export");
-      const local = localFiles.get(draftId) ?? {};
-      const get = async (kind: SourceKind): Promise<Blob | null> =>
-        local[kind] ??
-        (d.files[kind]?.received === d.files[kind]?.size && d.files[kind]
-          ? await api.sourceBlob(draftId, kind).catch(() => null)
-          : null);
-      const v = await get("video");
-      if (!alive || !v) return;
-      setVideoUrl(URL.createObjectURL(v));
-      const voice = (await get("dialogue")) ?? v;
-      decode(audioCtx(), voice)
-        .then((b) => alive && setWave(b))
-        .catch(() => {});
-      const bed = await get("bed");
-      if (bed)
-        decode(audioCtx(), bed)
-          .then((b) => alive && setBedBuf(b))
-          .catch(() => {});
     });
     return () => {
       alive = false;
     };
   }, [draftId]);
+
+  // media: the author's own file if the browser can decode it, otherwise the worker's proxy
+  const proxyStatus = draft?.proxyStatus;
+  useEffect(() => {
+    if (!draft || media === "ready") return;
+    let alive = true;
+    (async () => {
+      const local = localFiles.get(draftId) ?? {};
+      const complete = (k: SourceKind) =>
+        draft.files[k] && draft.files[k]!.received === draft.files[k]!.size;
+      const get = async (k: SourceKind | "proxy"): Promise<Blob | null> =>
+        (k !== "proxy" ? local[k] : undefined) ??
+        (k === "proxy" || complete(k) ? await api.sourceBlob(draftId, k).catch(() => null) : null);
+
+      let videoBlob: Blob | null = local.video ?? null;
+      if (videoBlob) {
+        const url = URL.createObjectURL(videoBlob);
+        if (!(await canPlay(url))) {
+          URL.revokeObjectURL(url);
+          videoBlob = null;
+        } else if (alive) setVideoUrl(url);
+      }
+      if (!videoBlob) {
+        if (proxyStatus === "queued" || proxyStatus === "processing")
+          return alive && setMedia("proxy-wait");
+        if (proxyStatus !== "done") return alive && setMedia("failed");
+        videoBlob = await get("proxy");
+        if (!videoBlob || !alive) return alive && setMedia("failed");
+        setVideoUrl(URL.createObjectURL(videoBlob));
+      }
+      setMedia("ready");
+      const voice = (await get("dialogue")) ?? videoBlob;
+      decode(audioCtx(), voice)
+        .then((b) => alive && setWave(b))
+        .catch(async () => {
+          // the source's audio may be undecodable too — the proxy's Opus always works
+          const p = proxyStatus === "done" ? await get("proxy") : null;
+          if (p)
+            decode(audioCtx(), p)
+              .then((b) => alive && setWave(b))
+              .catch(() => {});
+        });
+      const bed = await get("bed");
+      if (bed)
+        decode(audioCtx(), bed)
+          .then((b) => alive && setBedBuf(b))
+          .catch(() => {});
+    })();
+    return () => {
+      alive = false;
+    };
+    // re-run when the proxy becomes available
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftId, proxyStatus, Boolean(draft)]);
+
+  // poll while the proxy is being made; adopt the exact source duration measured by ffprobe
+  useEffect(() => {
+    if (proxyStatus !== "queued" && proxyStatus !== "processing") return;
+    const t = setInterval(() => api.draft(draftId).then((r) => setDraft(r.draft)), 2000);
+    return () => clearInterval(t);
+  }, [proxyStatus, draftId]);
+
+  const measured = draft?.sourceDurationMs ?? null;
+  useEffect(() => {
+    if (!measured || !m || m.durationMs === measured) return;
+    update((mm) => ({
+      ...mm,
+      durationMs: measured,
+      source: {
+        ...mm.source,
+        trimStartMs: Math.min(mm.source?.trimStartMs ?? 0, measured - 1000),
+        trimEndMs: Math.min(
+          mm.source?.trimEndMs && mm.source.trimEndMs > 1000 ? mm.source.trimEndMs : measured,
+          measured,
+        ),
+      },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [measured]);
 
   // autosave (debounced)
   useEffect(() => {
@@ -168,6 +231,10 @@ export function Editor({ draftId }: { draftId: string }) {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.key === "n" || e.key === "N" || e.key === "т" || e.key === "Т") && step === "lines") {
+        addLine();
+        return;
+      }
       const v = video.current;
       if (!v) return;
       const now = Math.round(v.currentTime * 1000 - trimStart);
@@ -271,6 +338,14 @@ export function Editor({ draftId }: { draftId: string }) {
 
       <section className="editor__main">
         <div className="player">
+          {media === "proxy-wait" && (
+            <div className="player__msg">Готовим превью для браузера…</div>
+          )}
+          {media === "failed" && (
+            <div className="player__msg error-text">
+              Не удалось показать видео: {draft.errors[0]?.message ?? "формат не поддерживается"}
+            </div>
+          )}
           {videoUrl ? (
             <video ref={video} src={videoUrl} playsInline controls={step !== "check"} />
           ) : (

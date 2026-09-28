@@ -11,7 +11,7 @@ import {
   validateManifest,
   type ClipManifest,
 } from "./index.ts";
-import { buildPackage, synthesizeSource } from "./node.ts";
+import { buildPackage, buildProxy, synthesizeSource } from "./node.ts";
 
 const good = (): ClipManifest =>
   emptyManifest({
@@ -150,15 +150,23 @@ describe.skipIf(!hasFfmpeg)("build pipeline (ffmpeg)", () => {
     const r = await buildPackage({ manifest: m, video, bed, outDir: out, timeoutMs: 120_000 });
 
     const media = r.manifest.media!;
-    expect(media.video.map((v) => v.height)).toEqual([720, 480, 360]);
+    expect(media.video.map((v) => `${v.height}:${v.codec.slice(0, 4)}`)).toEqual([
+      "720:avc1",
+      "480:avc1",
+      "360:avc1",
+      "480:vp9",
+    ]);
     expect(media.bed.map((b) => b.codec)).toEqual(["opus", "mp4a.40.2"]);
     for (const url of [...media.video.map((v) => v.url), media.poster]) {
       expect(url).toMatch(/\.[0-9a-f]{8}\.\w+$/);
     }
-    expect(Object.keys(r.manifest.checksums!.files)).toHaveLength(8);
+    expect(Object.keys(r.manifest.checksums!.files)).toHaveLength(9);
     const written = JSON.parse(await readFile(join(out, "manifest.json"), "utf8")) as ClipManifest;
     expect(written.source).toBeUndefined();
     expect(written.durationMs).toBe(12_000);
-    expect((await readdir(join(out, "video"))).length).toBe(3);
+    expect((await readdir(join(out, "video"))).length).toBe(4);
+
+    const proxy = await buildProxy(video, join(dir, "proxy.webm"));
+    expect(proxy.durationMs).toBe(12_000);
   }, 120_000);
 });

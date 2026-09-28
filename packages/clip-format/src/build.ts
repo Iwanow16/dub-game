@@ -258,8 +258,48 @@ export async function buildPackage(input: BuildInput): Promise<BuildResult> {
     );
     const h = await hashName(out, rel);
     video.push({ height: r.height, codec: r.codec, url: h.url, bytes: h.bytes });
-    progress(0.05 + (0.5 * (i + 1)) / rungs.length);
+    progress(0.05 + (0.45 * (i + 1)) / rungs.length);
   }
+
+  // 2a. royalty-free fallback for browsers without H.264 (open-source Chromium, some Linux
+  // Firefox builds): one 480p VP9/WebM rung; clients pick by canPlayType.
+  log("transcode 480p vp9");
+  const vp9Height = Math.min(480, src.video!.height);
+  await ffmpeg(
+    [
+      ...trim,
+      "-i",
+      input.video,
+      "-an",
+      "-sn",
+      "-dn",
+      "-map_metadata",
+      "-1",
+      "-vf",
+      `scale=-2:${vp9Height}:flags=lanczos,fps=30,format=yuv420p`,
+      "-c:v",
+      "libvpx-vp9",
+      "-b:v",
+      "0",
+      "-crf",
+      "36",
+      "-row-mt",
+      "1",
+      "-deadline",
+      "good",
+      "-cpu-used",
+      "4",
+      "-g",
+      "60",
+      join(out, "video/480p.vp9.webm"),
+    ],
+    t,
+  );
+  {
+    const h = await hashName(out, "video/480p.vp9.webm");
+    video.push({ height: vp9Height, codec: "vp9", url: h.url, bytes: h.bytes });
+  }
+  progress(0.55);
 
   // 3. bed: normalize to -23 LUFS (EBU R128), Opus + AAC fallback for old Safari
   log("bed audio");
@@ -473,4 +513,52 @@ export async function buildPackage(input: BuildInput): Promise<BuildResult> {
   progress(1);
   log("done");
   return { manifest: m, warnings };
+}
+
+/**
+ * Editing proxy for Clip Studio: authors' sources (HEVC .mov from phones, MKV, 4K) often don't play
+ * in a browser. The worker makes a small VP9/Opus WebM that every modern browser decodes, and
+ * reports the exact duration.
+ */
+export async function buildProxy(
+  video: string,
+  outFile: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<{ durationMs: number; height: number }> {
+  const src = await probe(video);
+  const issues = checkVideo(src).filter((i) => i.code !== "resolution_min");
+  if (issues.length) throw new BuildError("исходник не прошёл проверку", issues);
+  await ffmpeg(
+    [
+      "-i",
+      video,
+      "-sn",
+      "-dn",
+      "-map_metadata",
+      "-1",
+      "-vf",
+      "scale=-2:'min(480,ih)':flags=bilinear,fps=30,format=yuv420p",
+      "-c:v",
+      "libvpx-vp9",
+      "-b:v",
+      "0",
+      "-crf",
+      "40",
+      "-row-mt",
+      "1",
+      "-deadline",
+      "realtime",
+      "-cpu-used",
+      "8",
+      "-c:a",
+      "libopus",
+      "-b:a",
+      "64k",
+      "-ac",
+      "1",
+      outFile,
+    ],
+    { timeoutMs: opts.timeoutMs ?? 10 * 60_000 },
+  );
+  return { durationMs: src.durationMs, height: src.video!.height };
 }

@@ -310,3 +310,14 @@ kbd {
   display: grid;
   gap: 10px;
 }
+
+.player__msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  background: rgb(0 0 0 / 60%);
+  z-index: 1;
+}

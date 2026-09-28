@@ -59,7 +59,7 @@ export async function publishPackage(opts: PublishOptions): Promise<{ draftId: s
         await fh.read(buf, 0, len, offset);
         await call(
           f,
-          `${base}/api/studio/drafts/${draftId}/files/${kind}?offset=${offset}&total=${size}`,
+          `${base}/api/studio/drafts/${draftId}/files/${kind}?offset=${offset}&total=${size}&proxy=0`,
           opts.key,
           {
             method: "PUT",
