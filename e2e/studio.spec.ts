@@ -35,7 +35,15 @@ test("author publishes a clip through Clip Studio", async ({ page }) => {
   await expect(page.getByText("сохранено")).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: "test-results/screens/21-studio-lines.png" });
 
-  await page.getByRole("button", { name: "6 Экспорт" }).click();
+  // scenes step: a short clip stays one scene
+  await page.getByRole("button", { name: "5 Сцены" }).click();
+  await page.getByRole("button", { name: "Авторазбивка" }).click();
+  await expect(page.locator(".scene-list li")).toHaveCount(1);
+  await expect(page.locator(".wave__scene")).toHaveCount(1);
+  await page.getByRole("button", { name: "Увеличить масштаб" }).click();
+  await expect(page.getByLabel("Прокрутка таймлайна")).toBeVisible();
+
+  await page.getByRole("button", { name: "7 Экспорт" }).click();
   await page.getByRole("button", { name: "Отправить на обработку" }).click();
   await expect(page.getByText(/ждёт модерации/)).toBeVisible({ timeout: 120_000 });
 

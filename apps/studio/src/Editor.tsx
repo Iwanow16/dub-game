@@ -1,36 +1,49 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ROLE_COLORS,
+  SCENE_LIMITS,
+  autoScenes,
   linesFromSrt,
   parseSrt,
   validateManifest,
   type ClipLine,
   type ClipManifest,
+  type ClipScene,
 } from "@dubroom/clip-format";
 import { TakeRecorder, decode } from "@dubroom/audio";
 import { AGE_RATINGS, type AgeRating } from "@dubroom/shared";
 import { Button, useToast } from "@dubroom/ui";
 import { ApiError, api, uploadSource, type Draft, type SourceKind } from "./api.ts";
-import { audioCtx } from "./audio.ts";
+import { audioCtx, fetchPeaks, peaksFromBuffer, type Peaks } from "./audio.ts";
 import { canPlay, localFiles, setLocalFile } from "./localFiles.ts";
-import { Waveform } from "./Waveform.tsx";
+import { Waveform, type View } from "./Waveform.tsx";
 import { SubtitleOverlay } from "./SubtitleOverlay.tsx";
 import { IssueList } from "./IssueList.tsx";
 import { StatusBadge } from "./Library.tsx";
 
-type Step = "trim" | "voice" | "lines" | "check" | "export";
+type Step = "trim" | "voice" | "lines" | "scenes" | "check" | "export";
 const STEPS: { id: Step; label: string }[] = [
   { id: "trim", label: "2 Обрезка" },
   { id: "voice", label: "3 Голос" },
   { id: "lines", label: "4 Реплики" },
-  { id: "check", label: "5 Проверка" },
-  { id: "export", label: "6 Экспорт" },
+  { id: "scenes", label: "5 Сцены" },
+  { id: "check", label: "6 Проверка" },
+  { id: "export", label: "7 Экспорт" },
 ];
 const FRAME_MS = 1000 / 30;
+/** sources above this are not downloaded whole: the proxy streams by a signed link (ADR-0009) */
+const LARGE_BYTES = 200 * 1024 * 1024;
+const LARGE_MS = 10 * 60_000;
+/** decoding a whole file into an AudioBuffer is fine only for short media */
+const DECODE_MAX_MS = 10 * 60_000;
+const ZOOMS = [1, 2, 4, 8, 16, 32, 64];
 
 const fmt = (ms: number) => {
   const s = Math.max(0, ms) / 1000;
-  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(3).padStart(6, "0")}`;
+  const h = Math.floor(s / 3600);
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const ss = (s % 60).toFixed(3).padStart(6, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 };
 
 /** Clip Studio editor (§9.2 steps 2–6, §20.3 layout). */
@@ -40,7 +53,10 @@ export function Editor({ draftId }: { draftId: string }) {
   const [m, setM] = useState<ClipManifest | null>(null);
   const [step, setStep] = useState<Step>("lines");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [wave, setWave] = useState<AudioBuffer | null>(null);
+  const [wave, setWave] = useState<Peaks | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [viewStart, setViewStart] = useState(0);
+  const [selectedScene, setSelectedScene] = useState<string | null>(null);
   const [bedBuf, setBedBuf] = useState<AudioBuffer | null>(null);
   const [srcPos, setSrcPos] = useState(0); // source time, ms
   const [selected, setSelected] = useState<string | null>(null);
@@ -53,6 +69,11 @@ export function Editor({ draftId }: { draftId: string }) {
   const trimEnd = m?.source?.trimEndMs ?? m?.durationMs ?? 0;
   const clipDuration = Math.max(0, trimEnd - trimStart);
   const clipPos = srcPos - trimStart;
+  const span = clipDuration > 0 ? clipDuration / zoom : 1;
+  const view: View = {
+    start: Math.max(0, Math.min(viewStart, clipDuration - span)),
+    span,
+  };
 
   const [media, setMedia] = useState<"loading" | "ready" | "proxy-wait" | "failed">("loading");
 
@@ -83,7 +104,11 @@ export function Editor({ draftId }: { draftId: string }) {
         (k !== "proxy" ? local[k] : undefined) ??
         (k === "proxy" || complete(k) ? await api.sourceBlob(draftId, k).catch(() => null) : null);
 
-      let videoBlob: Blob | null = local.video ?? null;
+      const large =
+        (draft.files.video?.size ?? 0) > LARGE_BYTES || (draft.sourceDurationMs ?? 0) > LARGE_MS;
+      const toWave = (b: AudioBuffer) => alive && setWave(peaksFromBuffer(b));
+
+      let videoBlob: Blob | null = large ? null : (local.video ?? null);
       if (videoBlob) {
         const url = URL.createObjectURL(videoBlob);
         if (!(await canPlay(url))) {
@@ -95,6 +120,25 @@ export function Editor({ draftId }: { draftId: string }) {
         if (proxyStatus === "queued" || proxyStatus === "processing")
           return alive && setMedia("proxy-wait");
         if (proxyStatus !== "done") return alive && setMedia("failed");
+        if (large) {
+          // long source: stream the proxy (Range requests) and draw the worker's peaks.bin
+          const link = await api.mediaLink(draftId).catch(() => null);
+          if (!link || !alive) return alive && setMedia("failed");
+          setVideoUrl(link.proxy);
+          setMedia("ready");
+          const dialogue = local.dialogue;
+          if (dialogue && dialogue.size < LARGE_BYTES)
+            decode(audioCtx(), dialogue)
+              .then(toWave)
+              .catch(() => {});
+          else fetchPeaks(link.peaks).then((p) => alive && p && setWave(p));
+          const bed = local.bed;
+          if (bed && (draft.sourceDurationMs ?? 0) <= DECODE_MAX_MS)
+            decode(audioCtx(), bed)
+              .then((b) => alive && setBedBuf(b))
+              .catch(() => {});
+          return;
+        }
         videoBlob = await get("proxy");
         if (!videoBlob || !alive) return alive && setMedia("failed");
         setVideoUrl(URL.createObjectURL(videoBlob));
@@ -102,13 +146,13 @@ export function Editor({ draftId }: { draftId: string }) {
       setMedia("ready");
       const voice = (await get("dialogue")) ?? videoBlob;
       decode(audioCtx(), voice)
-        .then((b) => alive && setWave(b))
+        .then(toWave)
         .catch(async () => {
           // the source's audio may be undecodable too — the proxy's Opus always works
           const p = proxyStatus === "done" ? await get("proxy") : null;
           if (p)
             decode(audioCtx(), p)
-              .then((b) => alive && setWave(b))
+              .then(toWave)
               .catch(() => {});
         });
       const bed = await get("bed");
@@ -196,7 +240,19 @@ export function Editor({ draftId }: { draftId: string }) {
     return () => cancelAnimationFrame(raf);
   }, [videoUrl, trimEnd]);
 
+  // the zoomed timeline follows the playhead
+  useEffect(() => {
+    if (zoom === 1) return;
+    if (clipPos < view.start || clipPos > view.start + view.span)
+      setViewStart(Math.max(0, clipPos - view.span * 0.1));
+  }, [clipPos, zoom, view.start, view.span]);
+
   const selectedLine = m?.lines.find((l) => l.id === selected) ?? null;
+  const scenes = useMemo(
+    () => [...(m?.scenes ?? [])].sort((a, b) => a.startMs - b.startMs),
+    [m?.scenes],
+  );
+  const sceneAtPos = scenes.find((sc) => clipPos >= sc.startMs && clipPos < sc.endMs) ?? null;
 
   const setLine = useCallback(
     (id: string, patch: Partial<ClipLine>) =>
@@ -225,6 +281,43 @@ export function Editor({ draftId }: { draftId: string }) {
     });
     setSelected(id);
   }, [m, clipPos, clipDuration, selectedLine, update]);
+
+  /** Splits the scene under `at` (or starts scenes at `at`), keeping lines whole. */
+  const splitScene = useCallback(
+    (at: number) =>
+      update((mm) => {
+        const list = [...(mm.scenes ?? [])].sort((a, b) => a.startMs - b.startMs);
+        // never cut a line: move the cut to the end of a line under it
+        const cutting = mm.lines.find((l) => l.startMs < at && l.endMs > at);
+        const cut = Math.round(cutting ? cutting.endMs : at);
+        if (!list.length) list.push({ id: "s1", startMs: 0, endMs: clipDuration });
+        const sc = list.find((x) => cut > x.startMs && cut < x.endMs);
+        if (!sc) return mm;
+        const next = nextSceneId(list);
+        list.push({ id: next, startMs: cut, endMs: sc.endMs });
+        sc.endMs = cut;
+        mm.scenes = list.sort((a, b) => a.startMs - b.startMs);
+        return mm;
+      }),
+    [update, clipDuration],
+  );
+
+  /** Removes the boundary nearest to `at`, merging the two scenes around it. */
+  const mergeSceneAt = useCallback(
+    (at: number) =>
+      update((mm) => {
+        const list = [...(mm.scenes ?? [])].sort((a, b) => a.startMs - b.startMs);
+        if (list.length < 2) return mm;
+        let best = 1;
+        for (let i = 1; i < list.length; i++)
+          if (Math.abs(list[i]!.startMs - at) < Math.abs(list[best]!.startMs - at)) best = i;
+        list[best - 1]!.endMs = list[best]!.endMs;
+        list.splice(best, 1);
+        mm.scenes = list;
+        return mm;
+      }),
+    [update],
+  );
 
   // hotkeys (§9.2): I/O — line bounds, Space — play, ←/→ — ±1 frame, N — new line, Delete
   useEffect(() => {
@@ -281,6 +374,21 @@ export function Editor({ draftId }: { draftId: string }) {
         case "Т":
           if (step === "lines") addLine();
           break;
+        case "[":
+        case "х":
+          if (step === "scenes") splitScene(Math.max(0, now));
+          break;
+        case "]":
+        case "ъ":
+          if (step === "scenes") mergeSceneAt(Math.max(0, now));
+          break;
+        case "+":
+        case "=":
+          setZoom((z) => ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(z) + 1)]!);
+          break;
+        case "-":
+          setZoom((z) => ZOOMS[Math.max(0, ZOOMS.indexOf(z) - 1)]!);
+          break;
         case "Delete":
           if (selectedLine && step === "lines") {
             update((mm) => ({ ...mm, lines: mm.lines.filter((l) => l.id !== selectedLine.id) }));
@@ -291,7 +399,7 @@ export function Editor({ draftId }: { draftId: string }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [step, selectedLine, setLine, addLine, update, trimStart]);
+  }, [step, selectedLine, setLine, addLine, update, trimStart, splitScene, mergeSceneAt]);
 
   const check = useMemo(
     () => (m ? validateManifest({ ...m, durationMs: clipDuration }) : null),
@@ -333,6 +441,10 @@ export function Editor({ draftId }: { draftId: string }) {
           <kbd>N</kbd> новая реплика
           <br />
           <kbd>Del</kbd> удалить
+          <br />
+          <kbd>[</kbd>/<kbd>]</kbd> разрезать/склеить сцену
+          <br />
+          <kbd>+</kbd>/<kbd>−</kbd> масштаб
         </p>
       </aside>
 
@@ -364,19 +476,58 @@ export function Editor({ draftId }: { draftId: string }) {
         {step !== "check" && step !== "export" && (
           <>
             <div className="track-label">Голос</div>
+            <div className="zoom row small">
+              <span>Масштаб</span>
+              <Button
+                size="small"
+                aria-label="Уменьшить масштаб"
+                disabled={zoom === ZOOMS[0]}
+                onClick={() => setZoom(ZOOMS[Math.max(0, ZOOMS.indexOf(zoom) - 1)]!)}
+              >
+                −
+              </Button>
+              <span className="mono">×{zoom}</span>
+              <Button
+                size="small"
+                aria-label="Увеличить масштаб"
+                disabled={zoom === ZOOMS[ZOOMS.length - 1]}
+                onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + 1)]!)}
+              >
+                +
+              </Button>
+              {zoom > 1 && (
+                <input
+                  type="range"
+                  aria-label="Прокрутка таймлайна"
+                  min={0}
+                  max={Math.max(0, clipDuration - view.span)}
+                  step={100}
+                  value={view.start}
+                  onChange={(e) => setViewStart(Number(e.target.value))}
+                />
+              )}
+            </div>
             <Waveform
-              buffer={wave}
+              peaks={wave}
               offsetMs={trimStart}
               durationMs={clipDuration}
+              view={view}
               lines={m.lines}
               roles={m.roles}
+              scenes={step === "scenes" || scenes.length > 1 ? scenes : []}
               selected={selected}
+              selectedScene={selectedScene}
               positionMs={clipPos}
               onSeek={seekClip}
               onSelect={(id) => {
                 setSelected(id);
                 const l = m.lines.find((x) => x.id === id);
                 if (l) seekClip(l.startMs);
+              }}
+              onSelectScene={(id) => {
+                setSelectedScene(id);
+                const sc = scenes.find((x) => x.id === id);
+                if (sc) seekClip(sc.startMs);
               }}
             />
             {!bedBuf && (
@@ -409,7 +560,9 @@ export function Editor({ draftId }: { draftId: string }) {
           {step === "voice" && (
             <VoicePanel
               draft={draft}
-              onUploaded={(kind, buf) => (kind === "bed" ? setBedBuf(buf) : setWave(buf))}
+              onUploaded={(kind, buf) =>
+                kind === "bed" ? setBedBuf(buf) : setWave(peaksFromBuffer(buf))
+              }
             />
           )}
           {step === "lines" && (
@@ -420,6 +573,21 @@ export function Editor({ draftId }: { draftId: string }) {
               setSelected={setSelected}
               setLine={setLine}
               addLine={addLine}
+            />
+          )}
+          {step === "scenes" && (
+            <ScenesPanel
+              m={m}
+              update={update}
+              scenes={scenes}
+              clipDuration={clipDuration}
+              selected={selectedScene ?? sceneAtPos?.id ?? null}
+              onSelect={(id) => {
+                setSelectedScene(id);
+                const sc = scenes.find((x) => x.id === id);
+                if (sc) seekClip(sc.startMs);
+              }}
+              split={() => splitScene(Math.max(0, Math.round(clipPos)))}
             />
           )}
           {(step === "check" || step === "export") && <MetaPanel m={m} update={update} />}
@@ -462,13 +630,24 @@ function TrimPanel({
           startMs: Math.max(0, l.startMs - d),
           endMs: Math.max(0, l.endMs - d),
         }));
+        if (mm.scenes?.length) {
+          mm.scenes = mm.scenes.map((sc) => ({
+            ...sc,
+            startMs: Math.max(0, sc.startMs - d),
+            endMs: Math.max(0, sc.endMs - d),
+          }));
+          mm.scenes[0]!.startMs = 0;
+        }
       }
       return { ...mm, source: next };
     });
   return (
     <>
       <h3>Обрезка</h3>
-      <p className="dr-muted small">Рекомендуемая длина — 10–60 с (допустимо 5–90 с).</p>
+      <p className="dr-muted small">
+        Длина не ограничена: короткий клип (10–60 с) играется целиком, длинный — трейлер, фрагмент
+        серии — делится на сцены (шаг 5), а в режиме «целиком» проигрывается потоково.
+      </p>
       <div className="row">
         <Button size="small" onClick={() => set({ trimStartMs: Math.min(current, end - 1000) })}>
           [ Начало = кадр
@@ -498,12 +677,9 @@ function TrimPanel({
           onChange={(e) => set({ trimEndMs: Math.min(duration, Number(e.target.value)) })}
         />
       </label>
-      <p
-        className={
-          len < 5 || len > 90 ? "error-text" : len < 10 || len > 60 ? "warn-text" : "ok-text"
-        }
-      >
-        Длина: {len.toFixed(1)} с
+      <p className={len < 5 ? "error-text" : "ok-text"}>
+        Длина: {fmt(len * 1000)}
+        {len * 1000 > SCENE_LIMITS.autoAboveMs && " — длинный клип, разметьте сцены"}
       </p>
     </>
   );
@@ -745,6 +921,145 @@ function LinesPanel({
               onChange={(e) => setLine(selected.id, { hint: e.target.value || undefined })}
             />
           </label>
+        </div>
+      )}
+    </>
+  );
+}
+
+function nextSceneId(list: { id: string }[]) {
+  return `s${Math.max(0, ...list.map((x) => Number(x.id.slice(1)) || 0)) + 1}`;
+}
+
+/** Step 5 — scenes (ADR-0009): how a long clip is split into rounds. */
+function ScenesPanel({
+  m,
+  update,
+  scenes,
+  clipDuration,
+  selected,
+  onSelect,
+  split,
+}: {
+  m: ClipManifest;
+  update: Update;
+  scenes: ClipScene[];
+  clipDuration: number;
+  selected: string | null;
+  onSelect: (id: string) => void;
+  split: () => void;
+}) {
+  const sel = scenes.find((x) => x.id === selected) ?? null;
+  const long = clipDuration > SCENE_LIMITS.autoAboveMs;
+  const setScene = (id: string, patch: Partial<ClipScene>) =>
+    update((mm) => {
+      mm.scenes = (mm.scenes ?? []).map((x) => (x.id === id ? { ...x, ...patch } : x));
+      return mm;
+    });
+  const lineCount = (sc: ClipScene) =>
+    m.lines.filter((l) => l.startMs >= sc.startMs && l.endMs <= sc.endMs).length;
+  return (
+    <>
+      <h3>Сцены</h3>
+      <p className="small dr-muted">
+        {long
+          ? "Длинный клип играется по одной сцене за раунд. Сцена — 5 с…2 мин, реплика не может пересекать её границу."
+          : "Короткий клип играется целиком; сцены нужны, только если хотите играть его частями."}
+      </p>
+      <div className="row">
+        <Button
+          size="small"
+          onClick={() => update((mm) => ({ ...mm, scenes: autoScenes(mm.lines, clipDuration) }))}
+        >
+          Авторазбивка
+        </Button>
+        <Button size="small" onClick={split}>
+          Разрезать здесь [
+        </Button>
+        {scenes.length > 0 && (
+          <Button
+            size="small"
+            variant="ghost"
+            onClick={() => update((mm) => ({ ...mm, scenes: undefined }))}
+          >
+            Сбросить
+          </Button>
+        )}
+      </div>
+      <ol className="scene-list">
+        {scenes.map((sc) => {
+          const len = sc.endMs - sc.startMs;
+          const bad = len < SCENE_LIMITS.minMs || len > SCENE_LIMITS.maxMs;
+          return (
+            <li key={sc.id}>
+              <button
+                type="button"
+                className={`line-item ${selected === sc.id ? "line-item--sel" : ""}`}
+                onClick={() => onSelect(sc.id)}
+              >
+                <strong>{sc.id}</strong> {fmt(sc.startMs)} · {Math.round(len / 1000)} с ·{" "}
+                {lineCount(sc)} репл.
+                {bad && <span className="error-text"> ⚠</span>}
+                {sc.title?.ru ? ` · ${sc.title.ru}` : ""}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+      {sel && (
+        <div className="line-props">
+          <h3>Сцена {sel.id}</h3>
+          <label className="dr-field">
+            <span>Название (RU)</span>
+            <input
+              className="dr-input"
+              value={sel.title?.ru ?? ""}
+              maxLength={60}
+              onChange={(e) =>
+                setScene(sel.id, {
+                  title: e.target.value ? { ...sel.title, ru: e.target.value } : undefined,
+                })
+              }
+            />
+          </label>
+          <div className="row">
+            <label className="dr-field">
+              <span>Начало, мс</span>
+              <input
+                className="dr-input"
+                type="number"
+                value={sel.startMs}
+                onChange={(e) => setScene(sel.id, { startMs: Number(e.target.value) })}
+              />
+            </label>
+            <label className="dr-field">
+              <span>Конец, мс</span>
+              <input
+                className="dr-input"
+                type="number"
+                value={sel.endMs}
+                onChange={(e) => setScene(sel.id, { endMs: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+          <Button
+            size="small"
+            variant="danger"
+            onClick={() =>
+              update((mm) => {
+                const list = [...(mm.scenes ?? [])].sort((a, b) => a.startMs - b.startMs);
+                const i = list.findIndex((x) => x.id === sel.id);
+                // the neighbour absorbs the removed range
+                if (i > 0) list[i - 1]!.endMs = list[i]!.endMs;
+                else if (list[1]) list[1].startMs = list[0]!.startMs;
+                list.splice(i, 1);
+                mm.scenes = list.length ? list : undefined;
+                return mm;
+              })
+            }
+          >
+            Удалить сцену
+          </Button>
         </div>
       )}
     </>
