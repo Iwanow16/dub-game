@@ -1,4 +1,5 @@
 import { KNOWN_LICENSES, ManifestSchema, type ClipManifest } from "./manifest.ts";
+import { SCENE_LIMITS } from "./scenes.ts";
 
 export interface Issue {
   code: string;
@@ -15,11 +16,16 @@ export interface ValidationResult {
 
 export const LIMITS = {
   minDurationMs: 5_000,
-  maxDurationMs: 90_000,
+  /** default cap; servers override it with CLIP_MAX_MINUTES (any length is fine, see ADR-0009) */
+  maxDurationMs: 3 * 3600_000,
   recommendedMinMs: 10_000,
-  recommendedMaxMs: 60_000,
   minLineMs: 300,
 } as const;
+
+const fmtDuration = (ms: number) => {
+  const s = Math.round(ms / 1000);
+  return s >= 60 ? `${Math.floor(s / 60)} мин ${s % 60} с` : `${(ms / 1000).toFixed(1)} с`;
+};
 
 /**
  * Structural (schema) + semantic checks from §9.3 that do not need the media files.
@@ -27,7 +33,7 @@ export const LIMITS = {
  */
 export function validateManifest(
   input: unknown,
-  opts: { requireMedia?: boolean } = {},
+  opts: { requireMedia?: boolean; maxDurationMs?: number } = {},
 ): ValidationResult {
   const errors: Issue[] = [];
   const warnings: Issue[] = [];
@@ -40,17 +46,24 @@ export function validateManifest(
   }
   const m = parsed.data;
 
-  if (m.durationMs < LIMITS.minDurationMs || m.durationMs > LIMITS.maxDurationMs) {
+  const maxDuration = opts.maxDurationMs ?? LIMITS.maxDurationMs;
+  if (m.durationMs < LIMITS.minDurationMs || m.durationMs > maxDuration) {
     errors.push({
       code: "duration",
       path: "durationMs",
-      message: `длительность должна быть 5–90 с, сейчас ${(m.durationMs / 1000).toFixed(1)} с`,
+      message: `длительность должна быть от 5 с до ${fmtDuration(maxDuration)}, сейчас ${fmtDuration(m.durationMs)}`,
     });
-  } else if (m.durationMs < LIMITS.recommendedMinMs || m.durationMs > LIMITS.recommendedMaxMs) {
+  } else if (m.durationMs < LIMITS.recommendedMinMs) {
     warnings.push({
       code: "duration_recommended",
       path: "durationMs",
-      message: "рекомендуемая длительность клипа — 10–60 с",
+      message: "клип короче 10 с — игрокам почти нечего озвучить",
+    });
+  } else if (m.durationMs > SCENE_LIMITS.autoAboveMs && !m.scenes?.length) {
+    warnings.push({
+      code: "scenes_auto",
+      path: "scenes",
+      message: `длинный клип (${fmtDuration(m.durationMs)}): в режиме «сцены» он будет разбит на сцены автоматически — проверьте границы на шаге «Сцены»`,
     });
   }
 
@@ -117,6 +130,67 @@ export function validateManifest(
   const unused = m.roles.filter((r) => !m.lines.some((l) => l.role === r.id));
   for (const r of unused) {
     warnings.push({ code: "role_unused", path: "roles", message: `у роли ${r.id} нет реплик` });
+  }
+
+  // scenes (ADR-0009): ordered, non-overlapping, playable length, no line crosses a boundary
+  const scenes = [...(m.scenes ?? [])].sort((a, b) => a.startMs - b.startMs);
+  const sceneIds = new Set<string>();
+  scenes.forEach((sc, i) => {
+    const path = `scenes.${sc.id}`;
+    if (sceneIds.has(sc.id))
+      errors.push({ code: "scene_dup", path, message: `сцена ${sc.id} повторяется` });
+    sceneIds.add(sc.id);
+    const len = sc.endMs - sc.startMs;
+    if (len <= 0) {
+      errors.push({ code: "scene_order", path, message: `сцена ${sc.id}: конец раньше начала` });
+      return;
+    }
+    if (sc.endMs > m.durationMs) {
+      errors.push({ code: "scene_bounds", path, message: `сцена ${sc.id} выходит за конец клипа` });
+    }
+    if (len < SCENE_LIMITS.minMs || len > SCENE_LIMITS.maxMs) {
+      errors.push({
+        code: "scene_length",
+        path,
+        message: `сцена ${sc.id}: ${fmtDuration(len)} — нужно от 5 с до 2 мин`,
+      });
+    }
+    const prev = scenes[i - 1];
+    if (prev && sc.startMs < prev.endMs) {
+      errors.push({
+        code: "scene_overlap",
+        path,
+        message: `сцены ${prev.id} и ${sc.id} пересекаются`,
+      });
+    }
+    for (const l of m.lines) {
+      const crosses =
+        l.startMs < sc.endMs &&
+        l.endMs > sc.startMs &&
+        (l.startMs < sc.startMs || l.endMs > sc.endMs);
+      if (crosses) {
+        errors.push({
+          code: "scene_cuts_line",
+          path,
+          message: `граница сцены ${sc.id} разрезает реплику ${l.id} — сдвиньте границу в паузу`,
+        });
+      }
+    }
+    if (!m.lines.some((l) => l.startMs >= sc.startMs && l.endMs <= sc.endMs)) {
+      warnings.push({ code: "scene_empty", path, message: `в сцене ${sc.id} нет реплик` });
+    }
+  });
+  if (scenes.length) {
+    const outside = m.lines.filter(
+      (l) => !scenes.some((sc) => l.startMs >= sc.startMs && l.endMs <= sc.endMs),
+    );
+    if (outside.length) {
+      warnings.push({
+        code: "lines_outside_scenes",
+        path: "scenes",
+        message: `реплик вне сцен: ${outside.length} — в режиме «сцены» они не прозвучат`,
+      });
+    }
   }
 
   if (opts.requireMedia && !m.media) {

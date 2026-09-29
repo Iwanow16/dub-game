@@ -7,8 +7,10 @@ import type { Db, Draft } from "@dubroom/db";
 
 export interface WorkerOptions {
   dataDir: string;
-  /** per-ffmpeg-call timeout (§22.6) */
+  /** base per-ffmpeg-call timeout (§22.6); the pipeline adds time proportional to clip length */
   jobTimeoutMs: number;
+  /** longest allowed clip (CLIP_MAX_MINUTES) */
+  maxDurationMs?: number;
   log: (msg: string, extra?: object) => void;
 }
 
@@ -39,6 +41,7 @@ export async function processDraft(db: Db, draft: Draft, opts: WorkerOptions): P
       dialogue: file("dialogue"),
       outDir: tmpDir,
       timeoutMs: opts.jobTimeoutMs,
+      maxDurationMs: opts.maxDurationMs,
       log: (m) => opts.log(m, { draft: draft.id }),
       onProgress: (p) => {
         if (p - lastProgress >= 0.05 || p === 1) {
@@ -68,7 +71,11 @@ export async function processProxy(db: Db, draft: Draft, opts: WorkerOptions): P
   const out = join(dir, "proxy.webm");
   const tmp = join(dir, `proxy.tmp-${process.pid}.webm`);
   try {
-    const r = await buildProxy(join(dir, "video"), tmp, { timeoutMs: opts.jobTimeoutMs });
+    const r = await buildProxy(join(dir, "video"), tmp, {
+      timeoutMs: opts.jobTimeoutMs,
+      maxDurationMs: opts.maxDurationMs,
+      peaksFile: join(dir, "peaks.bin"),
+    });
     await rename(tmp, out);
     db.finishProxy(draft.id, { durationMs: r.durationMs });
     opts.log("proxy done", { draft: draft.id, durationMs: r.durationMs });

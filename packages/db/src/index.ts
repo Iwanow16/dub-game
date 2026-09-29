@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import type { ClipManifest, Issue } from "@dubroom/clip-format";
+import { sceneLines, sceneRoleCount, type ClipManifest, type Issue } from "@dubroom/clip-format";
 import type { Catalog, CatalogEntry } from "@dubroom/shared";
 
 /**
@@ -604,6 +604,18 @@ export class Db {
         manifestUrl: `${base}/manifest.json`,
         posterUrl: `${base}/${m.media!.poster}`,
         previewUrl: m.media!.preview ? `${base}/${m.media!.preview}` : null,
+        // scenes of long clips (ADR-0009); only those the worker has cut media for
+        scenes: (m.scenes ?? [])
+          .filter((sc) => sc.media)
+          .map((sc) => ({
+            id: sc.id,
+            startMs: sc.startMs,
+            endMs: sc.endMs,
+            ...(sc.title ? { title: sc.title } : {}),
+            rolesCount: Math.max(1, sceneRoleCount(m.lines, sc)),
+            roleIds: [...new Set(sceneLines(m.lines, sc).map((l) => l.role))].sort(),
+            posterUrl: `${base}/${sc.media!.poster}`,
+          })),
       };
     });
     return { schema: "dubroom.catalog/1", generatedAt: new Date().toISOString(), clips };

@@ -48,10 +48,19 @@ set +a
 
 [[ -d node_modules ]] || pnpm install
 
-pids=()
+# ports must be free — a stale process from an earlier run would serve old code
+for port in 3000 3001 5173 5174 5175; do
+  if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+    die "порт $port занят (старый dev.sh?) — освободите: fuser -k $port/tcp"
+  fi
+done
+
+# every service runs in its own process group, so stopping kills node grandchildren too
+set -m
+pgids=()
 cleanup() {
   trap - EXIT INT TERM
-  for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done
+  for g in "${pgids[@]}"; do kill -TERM -- "-$g" 2>/dev/null || true; done
   wait 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
@@ -60,7 +69,7 @@ run() {
   local name=$1
   shift
   ("$@" 2>&1 | sed -u "s/^/[$name] /") &
-  pids+=($!)
+  pgids+=($!)
 }
 
 run api pnpm -F @dubroom/api dev

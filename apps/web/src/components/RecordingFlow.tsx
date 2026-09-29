@@ -10,13 +10,15 @@ import {
 import {
   EFFECTS,
   localized,
+  maxAttempts,
   normalizeGain,
-  type CatalogEntry,
+  recordingBitrate,
+  rehearsalAllowed,
   type EffectId,
 } from "@dubroom/shared";
 import { Button, LevelMeter, LineTimeline, SyncSlider } from "@dubroom/ui";
 import { audioContext, ctxTimeToPerf, roundTripMs, sounds, unlockAudio } from "../lib/audio.ts";
-import { loadClip, type LoadedClip } from "../lib/media.ts";
+import { loadClip, type ClipRef, type LoadedClip } from "../lib/media.ts";
 import { useMic } from "../lib/mic.ts";
 import { usePrefs } from "../lib/prefs.ts";
 import { playOnStage, type Playback } from "../lib/stage.ts";
@@ -35,7 +37,6 @@ type Mode = "loading" | "menu" | "rehearsing" | "countdown" | "recording" | "rev
 
 const COUNTDOWN_S = 3;
 const TAIL_MS = 600;
-const MAX_ATTEMPTS = 2;
 
 /**
  * Rehearse → countdown → record → listen back with effect + sync slider → submit (US-3, §20.3).
@@ -51,7 +52,7 @@ export function RecordingFlow({
   submitLabel,
   busy,
 }: {
-  clipEntry: Pick<CatalogEntry, "manifestUrl">;
+  clipEntry: ClipRef;
   myRoles: string[] | null;
   improv?: boolean;
   onLoaded?: () => void;
@@ -77,10 +78,14 @@ export function RecordingFlow({
   const [silentHint, setSilentHint] = useState(false);
   const [take, setTake] = useState<{
     blob: Blob;
-    buffer: AudioBuffer;
+    /** decoded take (short clips/scenes) or a blob URL played as a stream (long clips) */
+    buffer: AudioBuffer | null;
+    url: string | null;
     baseOffset: number;
     gain: number;
   } | null>(null);
+  /** loudness of the voice measured live while recording (long takes aren't decoded) */
+  const liveRms = useRef({ sum: 0, n: 0 });
   const [effect, setEffect] = useState<EffectId>("none");
   const [manual, setManual] = useState(0);
   const [loadError, setLoadError] = useState(false);
@@ -102,7 +107,7 @@ export function RecordingFlow({
       playback.current?.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clipEntry.manifestUrl]);
+  }, [clipEntry.manifestUrl, clipEntry.scene?.id]);
 
   // live mic level + "we can't hear you" hint during own lines (§20.3)
   useEffect(() => {
@@ -114,6 +119,11 @@ export function RecordingFlow({
       const l = meter.level();
       setLevel(l);
       raf = requestAnimationFrame(loop);
+      if (mode === "recording" && l > 0.05) {
+        // level() is RMS × 5, clamped — collect the speaking parts for loudness matching
+        liveRms.current.sum += (l / 5) ** 2;
+        liveRms.current.n++;
+      }
       if (mode !== "recording" || !clip) {
         silentSince = 0;
         return;
@@ -144,6 +154,7 @@ export function RecordingFlow({
   }, []);
 
   const bedGain = prefs.headphones ? 1 : 0.35;
+  const attemptsAllowed = clip ? maxAttempts(clip.manifest.durationMs) : 2;
 
   const rehearse = async () => {
     if (!clip || !videoRef.current) return;
@@ -162,12 +173,12 @@ export function RecordingFlow({
     setTake(null);
     setSilentHint(false);
     setMode("countdown");
-    const rec = new TakeRecorder(mic.stream);
+    const rec = new TakeRecorder(mic.stream, recordingBitrate(clip.manifest.durationMs));
     recorder.current = rec;
+    liveRms.current = { sum: 0, n: 0 };
     const recStart = await rec.start();
     const ctx = audioContext();
     const when = ctx.currentTime + COUNTDOWN_S;
-    const clipStartPerf = ctxTimeToPerf(ctx, when);
     for (let i = COUNTDOWN_S; i > 0; i--) {
       setTimeout(
         () => {
@@ -189,21 +200,32 @@ export function RecordingFlow({
       tailMs: TAIL_MS,
       onPosition,
     });
+    // streamed clips may start a little later than asked (buffering): align to the real start
+    const clipStartPerf = ctxTimeToPerf(ctx, playback.current.when);
     await playback.current.done;
     if (recorder.current !== rec) return; // restarted meanwhile
     const result = await rec.stop();
     recorder.current = null;
     onRecordingChange?.(false);
     setAttempts((a) => a + 1);
-    const buffer = await decode(audioContext(), result.blob);
+    const buffer = clip.streaming ? null : await decode(audioContext(), result.blob);
     const baseOffset = alignOffsetMs({
       recStartMs: recStart,
       clipStartMs: clipStartPerf,
       roundTripLatencyMs: roundTripMs(),
       manualOffsetMs: 0,
     });
-    const gain = normalizeGain(activeRms(buffer.getChannelData(0), buffer.sampleRate));
-    setTake({ blob: result.blob, buffer, baseOffset, gain });
+    const rms = buffer
+      ? activeRms(buffer.getChannelData(0), buffer.sampleRate)
+      : Math.sqrt(liveRms.current.sum / Math.max(1, liveRms.current.n));
+    const gain = normalizeGain(rms);
+    setTake({
+      blob: result.blob,
+      buffer,
+      url: buffer ? null : URL.createObjectURL(result.blob),
+      baseOffset,
+      gain,
+    });
     setPos(-1);
     setMode("review");
   };
@@ -226,9 +248,17 @@ export function RecordingFlow({
     playback.current = await playOnStage(videoRef.current, {
       clip,
       bedGain: 1,
-      voices: [
-        { buffer: take.buffer, effect, gain: take.gain, offsetMs: take.baseOffset + manual },
-      ],
+      ...(take.buffer
+        ? {
+            voices: [
+              { buffer: take.buffer, effect, gain: take.gain, offsetMs: take.baseOffset + manual },
+            ],
+          }
+        : {
+            streamVoices: [
+              { src: take.url!, effect, gain: take.gain, offsetMs: take.baseOffset + manual },
+            ],
+          }),
       onPosition,
     });
     await playback.current.done;
@@ -333,11 +363,13 @@ export function RecordingFlow({
 
         {mode === "menu" && (
           <div className="row">
-            <Button onClick={rehearse}>{t("rec.rehearse")}</Button>
+            {clip && rehearsalAllowed(clip.manifest.durationMs) && (
+              <Button onClick={rehearse}>{t("rec.rehearse")}</Button>
+            )}
             <Button
               variant="primary"
               onClick={record}
-              disabled={!mic.stream || attempts >= MAX_ATTEMPTS}
+              disabled={!mic.stream || attempts >= attemptsAllowed}
             >
               {t("rec.start")}
             </Button>
@@ -375,8 +407,8 @@ export function RecordingFlow({
             </div>
             <div className="row">
               <Button onClick={listen}>▶</Button>
-              <Button onClick={record} disabled={attempts >= MAX_ATTEMPTS || busy}>
-                {t("rec.rerecord", { n: MAX_ATTEMPTS - attempts })}
+              <Button onClick={record} disabled={attempts >= attemptsAllowed || busy}>
+                {t("rec.rerecord", { n: attemptsAllowed - attempts })}
               </Button>
               <Button variant="primary" onClick={submit} disabled={busy}>
                 {submitLabel ?? t("rec.send")}
