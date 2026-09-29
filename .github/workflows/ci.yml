@@ -30,6 +30,17 @@ jobs:
       - run: pnpm build
       - run: pnpm -F @dubroom/help check
 
+  colab:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q pytest numpy scikit-learn requests
+      - run: python tools/colab/build_notebook.py --check
+      - run: pytest -q tools/colab
+
   shellcheck:
     runs-on: ubuntu-24.04
     steps:

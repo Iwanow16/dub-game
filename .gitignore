@@ -37,3 +37,7 @@ content/**/dist/
 e2e/fake-voice.wav
 infra/cloudflared/config.yml
 infra/cloudflared/cert.pem
+
+# python (tools/colab)
+__pycache__/
+.pytest_cache/
