@@ -353,10 +353,11 @@ export async function buildPackage(input: BuildInput): Promise<BuildResult> {
       "36",
       "-row-mt",
       "1",
+      // fallback rung only: long clips use the realtime encoder, or it outlasts the whole ladder
       "-deadline",
-      m.durationMs > 20 * 60_000 ? "realtime" : "good",
+      m.durationMs > 2 * 60_000 ? "realtime" : "good",
       "-cpu-used",
-      m.durationMs > 20 * 60_000 ? "8" : "4",
+      m.durationMs > 2 * 60_000 ? "8" : "4",
       ...GOP,
       join(out, "video/480p.vp9.webm"),
     ],
