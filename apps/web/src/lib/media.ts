@@ -1,4 +1,4 @@
-import type { CatalogEntry } from "@dubroom/shared";
+import { STREAM_THRESHOLD_MS, type CatalogEntry } from "@dubroom/shared";
 import { decode } from "@dubroom/audio";
 import { audioContext } from "./audio.ts";
 import { usePrefs } from "./prefs.ts";
@@ -25,15 +25,41 @@ export interface Manifest {
     preview: string | null;
   };
   sync: { leadInMs: number; videoAudioOffsetMs: number };
+  scenes?: {
+    id: string;
+    startMs: number;
+    endMs: number;
+    title?: { ru?: string; en?: string };
+    media?: {
+      video: { height: number; codec: string; url: string; bytes: number }[];
+      bed: { codec: string; url: string; bytes: number }[];
+      poster: string;
+    };
+  }[];
 }
 
+/**
+ * A clip ready to play. Short clips and scenes are preloaded (video blob + decoded bed); long clips
+ * played whole are streamed from their URLs (ADR-0009) — nothing long is decoded into memory.
+ */
 export interface LoadedClip {
+  /** manifest of what is played: for a scene, lines are re-timed and durationMs is the scene's */
   manifest: Manifest;
   base: string;
+  streaming: boolean;
   videoUrl: string;
   videoHeight: number;
+  /** preloaded mode */
   bed: AudioBuffer | null;
+  /** streaming mode */
+  bedUrl: string | null;
   posterUrl: string;
+}
+
+/** What loadClip needs from a catalog entry / playable. */
+export interface ClipRef {
+  manifestUrl: string;
+  scene?: { id: string } | null;
 }
 
 const manifests = new Map<string, Promise<Manifest>>();
@@ -79,7 +105,7 @@ export function playableRungs(m: Manifest): Manifest["media"]["video"] {
   return h264.length ? h264 : ok.length ? ok : m.media.video;
 }
 
-export function chooseVideo(m: Manifest): Manifest["media"]["video"][number] {
+export function chooseVideo(m: Manifest, streaming = false): Manifest["media"]["video"][number] {
   const ladder = [...playableRungs(m)].sort((a, b) => b.height - a.height);
   const pref = usePrefs.getState().quality;
   if (pref !== "auto") return ladder.find((v) => v.height <= pref) ?? ladder[ladder.length - 1]!;
@@ -96,6 +122,11 @@ export function chooseVideo(m: Manifest): Manifest["media"]["video"][number] {
       : conn?.effectiveType === "3g"
         ? 90_000
         : 600_000);
+  if (streaming) {
+    // streamed: the rung's bitrate must fit comfortably into the connection
+    const seconds = Math.max(1, m.durationMs / 1000);
+    return ladder.find((v) => v.bytes / seconds <= bps * 0.6) ?? ladder[ladder.length - 1]!;
+  }
   const budgetS = 10;
   return ladder.find((v) => v.bytes / bps <= budgetS) ?? ladder[ladder.length - 1]!;
 }
@@ -131,15 +162,29 @@ async function fetchBlob(url: string, onProgress?: (p: number) => void): Promise
  * Full load of the chosen clip before rehearsal (§11.3 step 4): the whole video as a blob URL
  * (instant seeks, no mid-take buffering) and the bed decoded for sample-accurate playback.
  */
-export function loadClip(
-  entry: Pick<CatalogEntry, "manifestUrl">,
-  onProgress?: (p: number) => void,
-): Promise<LoadedClip> {
-  let p = clips.get(entry.manifestUrl);
+export function loadClip(entry: ClipRef, onProgress?: (p: number) => void): Promise<LoadedClip> {
+  const key = `${entry.manifestUrl}#${entry.scene?.id ?? ""}`;
+  let p = clips.get(key);
   if (!p) {
     p = (async () => {
-      const manifest = await loadManifest(entry.manifestUrl);
+      const full = await loadManifest(entry.manifestUrl);
       const base = baseOf(entry.manifestUrl);
+      const manifest = entry.scene ? sceneManifest(full, entry.scene.id) : full;
+      if (!entry.scene && full.durationMs > STREAM_THRESHOLD_MS) {
+        // long clip played whole: stream it (range requests, faststart MP4)
+        const video = chooseVideo(manifest, true);
+        onProgress?.(1);
+        return {
+          manifest,
+          base,
+          streaming: true,
+          videoUrl: base + video.url,
+          videoHeight: video.height,
+          bed: null,
+          bedUrl: base + chooseBed(manifest).url,
+          posterUrl: base + manifest.media.poster,
+        };
+      }
       const video = chooseVideo(manifest);
       const bed = chooseBed(manifest);
       let vp = 0;
@@ -164,26 +209,44 @@ export function loadClip(
       return {
         manifest,
         base,
+        streaming: false,
         videoUrl: URL.createObjectURL(videoBlob),
         videoHeight: video.height,
         bed: bedBuf,
+        bedUrl: null,
         posterUrl: base + manifest.media.poster,
       };
     })();
-    p.catch(() => clips.delete(entry.manifestUrl));
-    clips.set(entry.manifestUrl, p);
+    p.catch(() => clips.delete(key));
+    clips.set(key, p);
   }
   return p;
+}
+
+/** The manifest of one scene: its own media, lines re-timed from the scene start. */
+export function sceneManifest(m: Manifest, sceneId: string): Manifest {
+  const sc = m.scenes?.find((x) => x.id === sceneId);
+  if (!sc?.media) throw new Error(`scene ${sceneId} not found`);
+  return {
+    ...m,
+    durationMs: sc.endMs - sc.startMs,
+    lines: m.lines
+      .filter((l) => l.startMs >= sc.startMs && l.endMs <= sc.endMs)
+      .map((l) => ({ ...l, startMs: l.startMs - sc.startMs, endMs: l.endMs - sc.startMs })),
+    media: { video: sc.media.video, bed: sc.media.bed, poster: sc.media.poster, preview: null },
+    scenes: undefined,
+  };
 }
 
 /**
  * Candidate preloading (§11.3 step 3): first ~500 KB of the medium rung via a low-priority Range
  * request, so whichever clip wins starts fast.
  */
-export function preloadCandidates(entries: CatalogEntry[]) {
+export function preloadCandidates(entries: (ClipRef & { durationMs: number })[]) {
   for (const e of entries) {
     loadManifest(e.manifestUrl)
-      .then((m) => {
+      .then((full) => {
+        const m = e.scene ? sceneManifest(full, e.scene.id) : full;
         const base = baseOf(e.manifestUrl);
         const rungs = [...playableRungs(m)].sort((a, b) => a.height - b.height);
         const medium = rungs[Math.min(1, rungs.length - 1)]!;

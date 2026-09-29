@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { analyserLevel, type VoiceLayer } from "@dubroom/audio";
-import type { CatalogEntry, Entry } from "@dubroom/shared";
+import { STREAM_THRESHOLD_MS, type Entry } from "@dubroom/shared";
 import { audioContext, unlockAudio } from "./audio.ts";
-import { loadClip, loadDub, type LoadedClip } from "./media.ts";
-import { playOnStage, type Playback } from "./stage.ts";
+import { loadClip, loadDub, type ClipRef, type LoadedClip } from "./media.ts";
+import { playOnStage, type Playback, type StreamVoice } from "./stage.ts";
 
 /**
  * Plays entries (a clip + one or more dubs) on a stage. Loads the clip and prefetches all dubs as
- * soon as entries are known (§11.6: ~0.75 MB for 5 players, fits in the watch lead time).
+ * soon as entries are known (§11.6: ~0.75 MB for 5 players, fits in the watch lead time). Long
+ * clips played whole stream their takes instead (ADR-0009).
  */
-export function useEntryPlayer(clipEntry: CatalogEntry | null, entries: Entry[]) {
+export function useEntryPlayer(
+  clipEntry: (ClipRef & { durationMs: number }) | null,
+  entries: Entry[],
+) {
+  const streamed = Boolean(
+    clipEntry && !clipEntry.scene && clipEntry.durationMs > STREAM_THRESHOLD_MS,
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const playback = useRef<Playback | null>(null);
   const [clip, setClip] = useState<LoadedClip | null>(null);
@@ -17,21 +24,24 @@ export function useEntryPlayer(clipEntry: CatalogEntry | null, entries: Entry[])
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [playing, setPlaying] = useState<string | null>(null);
 
+  const manifestUrl = clipEntry?.manifestUrl;
+  const sceneId = clipEntry?.scene?.id;
   useEffect(() => {
-    if (!clipEntry) return;
+    if (!manifestUrl) return;
     let alive = true;
-    loadClip(clipEntry)
+    loadClip({ manifestUrl, scene: sceneId ? { id: sceneId } : null })
       .then((c) => alive && setClip(c))
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [clipEntry]);
+  }, [manifestUrl, sceneId]);
 
   const dubKey = entries.flatMap((e) => e.tracks.map((t) => t.dubId)).join(",");
   useEffect(() => {
+    if (streamed) return;
     for (const id of dubKey.split(",").filter(Boolean)) loadDub(id).catch(() => {});
-  }, [dubKey]);
+  }, [dubKey, streamed]);
 
   useEffect(() => () => playback.current?.stop(), []);
 
@@ -50,22 +60,36 @@ export function useEntryPlayer(clipEntry: CatalogEntry | null, entries: Entry[])
       await unlockAudio();
       playback.current?.stop();
       const voices: (VoiceLayer & { key: string })[] = [];
-      await Promise.all(
-        entry.tracks.map(async (t, i) => {
-          try {
-            const buffer = await loadDub(t.dubId);
-            voices.push({
-              buffer,
-              effect: t.effect,
-              gain: t.gain,
-              offsetMs: t.offsetMs,
-              key: t.playerId || `t${i}`,
-            });
-          } catch {
-            /* a missing file just leaves that voice out */
-          }
-        }),
-      );
+      const streamVoices: (StreamVoice & { key: string })[] = [];
+      if (clip.streaming) {
+        entry.tracks.forEach((t, i) =>
+          streamVoices.push({
+            src: `/media/dubs/${encodeURIComponent(t.dubId)}`,
+            effect: t.effect,
+            gain: t.gain,
+            offsetMs: t.offsetMs,
+            key: t.playerId || `t${i}`,
+          }),
+        );
+      } else {
+        await Promise.all(
+          entry.tracks.map(async (t, i) => {
+            try {
+              const buffer = await loadDub(t.dubId);
+              voices.push({
+                buffer,
+                effect: t.effect,
+                gain: t.gain,
+                offsetMs: t.offsetMs,
+                key: t.playerId || `t${i}`,
+              });
+            } catch {
+              /* a missing file just leaves that voice out */
+            }
+          }),
+        );
+      }
+      const keys = (clip.streaming ? streamVoices : voices).map((v) => v.key);
       const ctx = audioContext();
       let when: number | undefined;
       let fromMs = 0;
@@ -78,12 +102,13 @@ export function useEntryPlayer(clipEntry: CatalogEntry | null, entries: Entry[])
       const pb = await playOnStage(videoRef.current, {
         clip,
         voices,
+        streamVoices,
         when,
         fromMs,
         onPosition: (ms) => {
           setPos(ms);
           const lv: Record<string, number> = {};
-          pb?.mix.analysers.forEach((an, i) => (lv[voices[i]!.key] = analyserLevel(an)));
+          pb?.mix.analysers.forEach((an, i) => (lv[keys[i]!] = analyserLevel(an)));
           setLevels(lv);
         },
       });

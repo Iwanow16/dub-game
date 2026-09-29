@@ -1,0 +1,1090 @@
+{
+  "schema": "dubroom.clip/1",
+  "id": "c_kommunalka01",
+  "slug": "kommunalka-fragment",
+  "version": 1,
+  "title": {
+    "ru": "Сериал «Коммуналка», фрагмент",
+    "en": "“The Flatshare” series, excerpt"
+  },
+  "durationMs": 420000,
+  "ageRating": "12+",
+  "tags": ["сериал", "комедия"],
+  "credit": "DubRoom starter pack (synthetic scene)",
+  "license": "CC0 1.0",
+  "roles": [
+    {
+      "id": "r1",
+      "name": {
+        "ru": "Оля",
+        "en": "Olya"
+      },
+      "color": "#FF6FB5"
+    },
+    {
+      "id": "r2",
+      "name": {
+        "ru": "Витя",
+        "en": "Vitya"
+      },
+      "color": "#3DA5FF"
+    },
+    {
+      "id": "r3",
+      "name": {
+        "ru": "Стас",
+        "en": "Stas"
+      },
+      "color": "#3DDC97"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "role": "r1",
+      "startMs": 2000,
+      "endMs": 4900,
+      "text": {
+        "ru": "Кто опять съел мой йогурт?",
+        "en": "Who ate my yogurt again?"
+      },
+      "hint": "возмущённо"
+    },
+    {
+      "id": "l2",
+      "role": "r2",
+      "startMs": 5800,
+      "endMs": 8600,
+      "text": {
+        "ru": "Он был подписан «общее».",
+        "en": "It was labelled “shared”."
+      }
+    },
+    {
+      "id": "l3",
+      "role": "r1",
+      "startMs": 9500,
+      "endMs": 12300,
+      "text": {
+        "ru": "Там было написано «Оля»!",
+        "en": "It said “Olya”!"
+      }
+    },
+    {
+      "id": "l4",
+      "role": "r3",
+      "startMs": 13200,
+      "endMs": 15900,
+      "text": {
+        "ru": "Я вообще только зашёл.",
+        "en": "I literally just got here."
+      },
+      "hint": "оправдываясь"
+    },
+    {
+      "id": "l5",
+      "role": "r2",
+      "startMs": 16800,
+      "endMs": 19200,
+      "text": {
+        "ru": "С ложкой в руке?",
+        "en": "With a spoon in your hand?"
+      },
+      "hint": "с подозрением"
+    },
+    {
+      "id": "l6",
+      "role": "r3",
+      "startMs": 20100,
+      "endMs": 23200,
+      "text": {
+        "ru": "Это моя ложка для размышлений.",
+        "en": "That's my thinking spoon."
+      }
+    },
+    {
+      "id": "l7",
+      "role": "r1",
+      "startMs": 24100,
+      "endMs": 26950,
+      "text": {
+        "ru": "Размышляй на своей полке!",
+        "en": "Think on your own shelf!"
+      },
+      "hint": "кричит"
+    },
+    {
+      "id": "l8",
+      "role": "r2",
+      "startMs": 31650,
+      "endMs": 34250,
+      "text": {
+        "ru": "Давайте проголосуем.",
+        "en": "Let's vote."
+      },
+      "hint": "примирительно"
+    },
+    {
+      "id": "l9",
+      "role": "r3",
+      "startMs": 35150,
+      "endMs": 38250,
+      "text": {
+        "ru": "Я голосую за то, чтобы забыть.",
+        "en": "I vote we forget about it."
+      }
+    },
+    {
+      "id": "l10",
+      "role": "r1",
+      "startMs": 39150,
+      "endMs": 42100,
+      "text": {
+        "ru": "Ты всегда за это голосуешь!",
+        "en": "You always vote for that!"
+      }
+    },
+    {
+      "id": "l11",
+      "role": "r2",
+      "startMs": 43000,
+      "endMs": 46050,
+      "text": {
+        "ru": "Кто выключил свет в коридоре?",
+        "en": "Who turned off the hallway light?"
+      }
+    },
+    {
+      "id": "l12",
+      "role": "r3",
+      "startMs": 46950,
+      "endMs": 49950,
+      "text": {
+        "ru": "Экономия. Я прочитал статью.",
+        "en": "Saving energy. I read an article."
+      },
+      "hint": "гордо"
+    },
+    {
+      "id": "l13",
+      "role": "r1",
+      "startMs": 50850,
+      "endMs": 53650,
+      "text": {
+        "ru": "Я чуть не упала в ведро!",
+        "en": "I nearly fell into a bucket!"
+      }
+    },
+    {
+      "id": "l14",
+      "role": "r2",
+      "startMs": 54550,
+      "endMs": 56750,
+      "text": {
+        "ru": "Какое ведро?",
+        "en": "What bucket?"
+      },
+      "hint": "удивлённо"
+    },
+    {
+      "id": "l15",
+      "role": "r3",
+      "startMs": 61450,
+      "endMs": 64000,
+      "text": {
+        "ru": "Моё ведро для идей.",
+        "en": "My idea bucket."
+      }
+    },
+    {
+      "id": "l16",
+      "role": "r1",
+      "startMs": 64900,
+      "endMs": 67600,
+      "text": {
+        "ru": "У тебя всё «для идей»!",
+        "en": "Everything you own is “for ideas”!"
+      },
+      "hint": "раздражённо"
+    },
+    {
+      "id": "l17",
+      "role": "r2",
+      "startMs": 68500,
+      "endMs": 71450,
+      "text": {
+        "ru": "Тихо, соседка снизу стучит.",
+        "en": "Quiet, the downstairs neighbour is knocking."
+      },
+      "hint": "шёпотом"
+    },
+    {
+      "id": "l18",
+      "role": "r3",
+      "startMs": 72350,
+      "endMs": 75150,
+      "text": {
+        "ru": "Это не соседка, это кот.",
+        "en": "That's not the neighbour, it's the cat."
+      }
+    },
+    {
+      "id": "l19",
+      "role": "r1",
+      "startMs": 76050,
+      "endMs": 78400,
+      "text": {
+        "ru": "У нас нет кота.",
+        "en": "We don't have a cat."
+      }
+    },
+    {
+      "id": "l20",
+      "role": "r3",
+      "startMs": 79300,
+      "endMs": 81500,
+      "text": {
+        "ru": "Теперь есть.",
+        "en": "We do now."
+      },
+      "hint": "загадочно"
+    },
+    {
+      "id": "l21",
+      "role": "r1",
+      "startMs": 82400,
+      "endMs": 85300,
+      "text": {
+        "ru": "Кто опять съел мой йогурт?",
+        "en": "Who ate my yogurt again?"
+      },
+      "hint": "возмущённо"
+    },
+    {
+      "id": "l22",
+      "role": "r2",
+      "startMs": 90000,
+      "endMs": 92800,
+      "text": {
+        "ru": "Он был подписан «общее».",
+        "en": "It was labelled “shared”."
+      }
+    },
+    {
+      "id": "l23",
+      "role": "r1",
+      "startMs": 93700,
+      "endMs": 96500,
+      "text": {
+        "ru": "Там было написано «Оля»!",
+        "en": "It said “Olya”!"
+      }
+    },
+    {
+      "id": "l24",
+      "role": "r3",
+      "startMs": 97400,
+      "endMs": 100100,
+      "text": {
+        "ru": "Я вообще только зашёл.",
+        "en": "I literally just got here."
+      },
+      "hint": "оправдываясь"
+    },
+    {
+      "id": "l25",
+      "role": "r2",
+      "startMs": 101000,
+      "endMs": 103400,
+      "text": {
+        "ru": "С ложкой в руке?",
+        "en": "With a spoon in your hand?"
+      },
+      "hint": "с подозрением"
+    },
+    {
+      "id": "l26",
+      "role": "r3",
+      "startMs": 104300,
+      "endMs": 107400,
+      "text": {
+        "ru": "Это моя ложка для размышлений.",
+        "en": "That's my thinking spoon."
+      }
+    },
+    {
+      "id": "l27",
+      "role": "r1",
+      "startMs": 108300,
+      "endMs": 111150,
+      "text": {
+        "ru": "Размышляй на своей полке!",
+        "en": "Think on your own shelf!"
+      },
+      "hint": "кричит"
+    },
+    {
+      "id": "l28",
+      "role": "r2",
+      "startMs": 112050,
+      "endMs": 114650,
+      "text": {
+        "ru": "Давайте проголосуем.",
+        "en": "Let's vote."
+      },
+      "hint": "примирительно"
+    },
+    {
+      "id": "l29",
+      "role": "r3",
+      "startMs": 119350,
+      "endMs": 122450,
+      "text": {
+        "ru": "Я голосую за то, чтобы забыть.",
+        "en": "I vote we forget about it."
+      }
+    },
+    {
+      "id": "l30",
+      "role": "r1",
+      "startMs": 123350,
+      "endMs": 126300,
+      "text": {
+        "ru": "Ты всегда за это голосуешь!",
+        "en": "You always vote for that!"
+      }
+    },
+    {
+      "id": "l31",
+      "role": "r2",
+      "startMs": 127200,
+      "endMs": 130250,
+      "text": {
+        "ru": "Кто выключил свет в коридоре?",
+        "en": "Who turned off the hallway light?"
+      }
+    },
+    {
+      "id": "l32",
+      "role": "r3",
+      "startMs": 131150,
+      "endMs": 134150,
+      "text": {
+        "ru": "Экономия. Я прочитал статью.",
+        "en": "Saving energy. I read an article."
+      },
+      "hint": "гордо"
+    },
+    {
+      "id": "l33",
+      "role": "r1",
+      "startMs": 135050,
+      "endMs": 137850,
+      "text": {
+        "ru": "Я чуть не упала в ведро!",
+        "en": "I nearly fell into a bucket!"
+      }
+    },
+    {
+      "id": "l34",
+      "role": "r2",
+      "startMs": 138750,
+      "endMs": 140950,
+      "text": {
+        "ru": "Какое ведро?",
+        "en": "What bucket?"
+      },
+      "hint": "удивлённо"
+    },
+    {
+      "id": "l35",
+      "role": "r3",
+      "startMs": 141850,
+      "endMs": 144400,
+      "text": {
+        "ru": "Моё ведро для идей.",
+        "en": "My idea bucket."
+      }
+    },
+    {
+      "id": "l36",
+      "role": "r1",
+      "startMs": 149100,
+      "endMs": 151800,
+      "text": {
+        "ru": "У тебя всё «для идей»!",
+        "en": "Everything you own is “for ideas”!"
+      },
+      "hint": "раздражённо"
+    },
+    {
+      "id": "l37",
+      "role": "r2",
+      "startMs": 152700,
+      "endMs": 155650,
+      "text": {
+        "ru": "Тихо, соседка снизу стучит.",
+        "en": "Quiet, the downstairs neighbour is knocking."
+      },
+      "hint": "шёпотом"
+    },
+    {
+      "id": "l38",
+      "role": "r3",
+      "startMs": 156550,
+      "endMs": 159350,
+      "text": {
+        "ru": "Это не соседка, это кот.",
+        "en": "That's not the neighbour, it's the cat."
+      }
+    },
+    {
+      "id": "l39",
+      "role": "r1",
+      "startMs": 160250,
+      "endMs": 162600,
+      "text": {
+        "ru": "У нас нет кота.",
+        "en": "We don't have a cat."
+      }
+    },
+    {
+      "id": "l40",
+      "role": "r3",
+      "startMs": 163500,
+      "endMs": 165700,
+      "text": {
+        "ru": "Теперь есть.",
+        "en": "We do now."
+      },
+      "hint": "загадочно"
+    },
+    {
+      "id": "l41",
+      "role": "r1",
+      "startMs": 166600,
+      "endMs": 169500,
+      "text": {
+        "ru": "Кто опять съел мой йогурт?",
+        "en": "Who ate my yogurt again?"
+      },
+      "hint": "возмущённо"
+    },
+    {
+      "id": "l42",
+      "role": "r2",
+      "startMs": 170400,
+      "endMs": 173200,
+      "text": {
+        "ru": "Он был подписан «общее».",
+        "en": "It was labelled “shared”."
+      }
+    },
+    {
+      "id": "l43",
+      "role": "r1",
+      "startMs": 177900,
+      "endMs": 180700,
+      "text": {
+        "ru": "Там было написано «Оля»!",
+        "en": "It said “Olya”!"
+      }
+    },
+    {
+      "id": "l44",
+      "role": "r3",
+      "startMs": 181600,
+      "endMs": 184300,
+      "text": {
+        "ru": "Я вообще только зашёл.",
+        "en": "I literally just got here."
+      },
+      "hint": "оправдываясь"
+    },
+    {
+      "id": "l45",
+      "role": "r2",
+      "startMs": 185200,
+      "endMs": 187600,
+      "text": {
+        "ru": "С ложкой в руке?",
+        "en": "With a spoon in your hand?"
+      },
+      "hint": "с подозрением"
+    },
+    {
+      "id": "l46",
+      "role": "r3",
+      "startMs": 188500,
+      "endMs": 191600,
+      "text": {
+        "ru": "Это моя ложка для размышлений.",
+        "en": "That's my thinking spoon."
+      }
+    },
+    {
+      "id": "l47",
+      "role": "r1",
+      "startMs": 192500,
+      "endMs": 195350,
+      "text": {
+        "ru": "Размышляй на своей полке!",
+        "en": "Think on your own shelf!"
+      },
+      "hint": "кричит"
+    },
+    {
+      "id": "l48",
+      "role": "r2",
+      "startMs": 196250,
+      "endMs": 198850,
+      "text": {
+        "ru": "Давайте проголосуем.",
+        "en": "Let's vote."
+      },
+      "hint": "примирительно"
+    },
+    {
+      "id": "l49",
+      "role": "r3",
+      "startMs": 199750,
+      "endMs": 202850,
+      "text": {
+        "ru": "Я голосую за то, чтобы забыть.",
+        "en": "I vote we forget about it."
+      }
+    },
+    {
+      "id": "l50",
+      "role": "r1",
+      "startMs": 207550,
+      "endMs": 210500,
+      "text": {
+        "ru": "Ты всегда за это голосуешь!",
+        "en": "You always vote for that!"
+      }
+    },
+    {
+      "id": "l51",
+      "role": "r2",
+      "startMs": 211400,
+      "endMs": 214450,
+      "text": {
+        "ru": "Кто выключил свет в коридоре?",
+        "en": "Who turned off the hallway light?"
+      }
+    },
+    {
+      "id": "l52",
+      "role": "r3",
+      "startMs": 215350,
+      "endMs": 218350,
+      "text": {
+        "ru": "Экономия. Я прочитал статью.",
+        "en": "Saving energy. I read an article."
+      },
+      "hint": "гордо"
+    },
+    {
+      "id": "l53",
+      "role": "r1",
+      "startMs": 219250,
+      "endMs": 222050,
+      "text": {
+        "ru": "Я чуть не упала в ведро!",
+        "en": "I nearly fell into a bucket!"
+      }
+    },
+    {
+      "id": "l54",
+      "role": "r2",
+      "startMs": 222950,
+      "endMs": 225150,
+      "text": {
+        "ru": "Какое ведро?",
+        "en": "What bucket?"
+      },
+      "hint": "удивлённо"
+    },
+    {
+      "id": "l55",
+      "role": "r3",
+      "startMs": 226050,
+      "endMs": 228600,
+      "text": {
+        "ru": "Моё ведро для идей.",
+        "en": "My idea bucket."
+      }
+    },
+    {
+      "id": "l56",
+      "role": "r1",
+      "startMs": 229500,
+      "endMs": 232200,
+      "text": {
+        "ru": "У тебя всё «для идей»!",
+        "en": "Everything you own is “for ideas”!"
+      },
+      "hint": "раздражённо"
+    },
+    {
+      "id": "l57",
+      "role": "r2",
+      "startMs": 236900,
+      "endMs": 239850,
+      "text": {
+        "ru": "Тихо, соседка снизу стучит.",
+        "en": "Quiet, the downstairs neighbour is knocking."
+      },
+      "hint": "шёпотом"
+    },
+    {
+      "id": "l58",
+      "role": "r3",
+      "startMs": 240750,
+      "endMs": 243550,
+      "text": {
+        "ru": "Это не соседка, это кот.",
+        "en": "That's not the neighbour, it's the cat."
+      }
+    },
+    {
+      "id": "l59",
+      "role": "r1",
+      "startMs": 244450,
+      "endMs": 246800,
+      "text": {
+        "ru": "У нас нет кота.",
+        "en": "We don't have a cat."
+      }
+    },
+    {
+      "id": "l60",
+      "role": "r3",
+      "startMs": 247700,
+      "endMs": 249900,
+      "text": {
+        "ru": "Теперь есть.",
+        "en": "We do now."
+      },
+      "hint": "загадочно"
+    },
+    {
+      "id": "l61",
+      "role": "r1",
+      "startMs": 250800,
+      "endMs": 253700,
+      "text": {
+        "ru": "Кто опять съел мой йогурт?",
+        "en": "Who ate my yogurt again?"
+      },
+      "hint": "возмущённо"
+    },
+    {
+      "id": "l62",
+      "role": "r2",
+      "startMs": 254600,
+      "endMs": 257400,
+      "text": {
+        "ru": "Он был подписан «общее».",
+        "en": "It was labelled “shared”."
+      }
+    },
+    {
+      "id": "l63",
+      "role": "r1",
+      "startMs": 258300,
+      "endMs": 261100,
+      "text": {
+        "ru": "Там было написано «Оля»!",
+        "en": "It said “Olya”!"
+      }
+    },
+    {
+      "id": "l64",
+      "role": "r3",
+      "startMs": 265800,
+      "endMs": 268500,
+      "text": {
+        "ru": "Я вообще только зашёл.",
+        "en": "I literally just got here."
+      },
+      "hint": "оправдываясь"
+    },
+    {
+      "id": "l65",
+      "role": "r2",
+      "startMs": 269400,
+      "endMs": 271800,
+      "text": {
+        "ru": "С ложкой в руке?",
+        "en": "With a spoon in your hand?"
+      },
+      "hint": "с подозрением"
+    },
+    {
+      "id": "l66",
+      "role": "r3",
+      "startMs": 272700,
+      "endMs": 275800,
+      "text": {
+        "ru": "Это моя ложка для размышлений.",
+        "en": "That's my thinking spoon."
+      }
+    },
+    {
+      "id": "l67",
+      "role": "r1",
+      "startMs": 276700,
+      "endMs": 279550,
+      "text": {
+        "ru": "Размышляй на своей полке!",
+        "en": "Think on your own shelf!"
+      },
+      "hint": "кричит"
+    },
+    {
+      "id": "l68",
+      "role": "r2",
+      "startMs": 280450,
+      "endMs": 283050,
+      "text": {
+        "ru": "Давайте проголосуем.",
+        "en": "Let's vote."
+      },
+      "hint": "примирительно"
+    },
+    {
+      "id": "l69",
+      "role": "r3",
+      "startMs": 283950,
+      "endMs": 287050,
+      "text": {
+        "ru": "Я голосую за то, чтобы забыть.",
+        "en": "I vote we forget about it."
+      }
+    },
+    {
+      "id": "l70",
+      "role": "r1",
+      "startMs": 287950,
+      "endMs": 290900,
+      "text": {
+        "ru": "Ты всегда за это голосуешь!",
+        "en": "You always vote for that!"
+      }
+    },
+    {
+      "id": "l71",
+      "role": "r2",
+      "startMs": 295600,
+      "endMs": 298650,
+      "text": {
+        "ru": "Кто выключил свет в коридоре?",
+        "en": "Who turned off the hallway light?"
+      }
+    },
+    {
+      "id": "l72",
+      "role": "r3",
+      "startMs": 299550,
+      "endMs": 302550,
+      "text": {
+        "ru": "Экономия. Я прочитал статью.",
+        "en": "Saving energy. I read an article."
+      },
+      "hint": "гордо"
+    },
+    {
+      "id": "l73",
+      "role": "r1",
+      "startMs": 303450,
+      "endMs": 306250,
+      "text": {
+        "ru": "Я чуть не упала в ведро!",
+        "en": "I nearly fell into a bucket!"
+      }
+    },
+    {
+      "id": "l74",
+      "role": "r2",
+      "startMs": 307150,
+      "endMs": 309350,
+      "text": {
+        "ru": "Какое ведро?",
+        "en": "What bucket?"
+      },
+      "hint": "удивлённо"
+    },
+    {
+      "id": "l75",
+      "role": "r3",
+      "startMs": 310250,
+      "endMs": 312800,
+      "text": {
+        "ru": "Моё ведро для идей.",
+        "en": "My idea bucket."
+      }
+    },
+    {
+      "id": "l76",
+      "role": "r1",
+      "startMs": 313700,
+      "endMs": 316400,
+      "text": {
+        "ru": "У тебя всё «для идей»!",
+        "en": "Everything you own is “for ideas”!"
+      },
+      "hint": "раздражённо"
+    },
+    {
+      "id": "l77",
+      "role": "r2",
+      "startMs": 317300,
+      "endMs": 320250,
+      "text": {
+        "ru": "Тихо, соседка снизу стучит.",
+        "en": "Quiet, the downstairs neighbour is knocking."
+      },
+      "hint": "шёпотом"
+    },
+    {
+      "id": "l78",
+      "role": "r3",
+      "startMs": 324950,
+      "endMs": 327750,
+      "text": {
+        "ru": "Это не соседка, это кот.",
+        "en": "That's not the neighbour, it's the cat."
+      }
+    },
+    {
+      "id": "l79",
+      "role": "r1",
+      "startMs": 328650,
+      "endMs": 331000,
+      "text": {
+        "ru": "У нас нет кота.",
+        "en": "We don't have a cat."
+      }
+    },
+    {
+      "id": "l80",
+      "role": "r3",
+      "startMs": 331900,
+      "endMs": 334100,
+      "text": {
+        "ru": "Теперь есть.",
+        "en": "We do now."
+      },
+      "hint": "загадочно"
+    },
+    {
+      "id": "l81",
+      "role": "r1",
+      "startMs": 335000,
+      "endMs": 337900,
+      "text": {
+        "ru": "Кто опять съел мой йогурт?",
+        "en": "Who ate my yogurt again?"
+      },
+      "hint": "возмущённо"
+    },
+    {
+      "id": "l82",
+      "role": "r2",
+      "startMs": 338800,
+      "endMs": 341600,
+      "text": {
+        "ru": "Он был подписан «общее».",
+        "en": "It was labelled “shared”."
+      }
+    },
+    {
+      "id": "l83",
+      "role": "r1",
+      "startMs": 342500,
+      "endMs": 345300,
+      "text": {
+        "ru": "Там было написано «Оля»!",
+        "en": "It said “Olya”!"
+      }
+    },
+    {
+      "id": "l84",
+      "role": "r3",
+      "startMs": 346200,
+      "endMs": 348900,
+      "text": {
+        "ru": "Я вообще только зашёл.",
+        "en": "I literally just got here."
+      },
+      "hint": "оправдываясь"
+    },
+    {
+      "id": "l85",
+      "role": "r2",
+      "startMs": 353600,
+      "endMs": 356000,
+      "text": {
+        "ru": "С ложкой в руке?",
+        "en": "With a spoon in your hand?"
+      },
+      "hint": "с подозрением"
+    },
+    {
+      "id": "l86",
+      "role": "r3",
+      "startMs": 356900,
+      "endMs": 360000,
+      "text": {
+        "ru": "Это моя ложка для размышлений.",
+        "en": "That's my thinking spoon."
+      }
+    },
+    {
+      "id": "l87",
+      "role": "r1",
+      "startMs": 360900,
+      "endMs": 363750,
+      "text": {
+        "ru": "Размышляй на своей полке!",
+        "en": "Think on your own shelf!"
+      },
+      "hint": "кричит"
+    },
+    {
+      "id": "l88",
+      "role": "r2",
+      "startMs": 364650,
+      "endMs": 367250,
+      "text": {
+        "ru": "Давайте проголосуем.",
+        "en": "Let's vote."
+      },
+      "hint": "примирительно"
+    },
+    {
+      "id": "l89",
+      "role": "r3",
+      "startMs": 368150,
+      "endMs": 371250,
+      "text": {
+        "ru": "Я голосую за то, чтобы забыть.",
+        "en": "I vote we forget about it."
+      }
+    },
+    {
+      "id": "l90",
+      "role": "r1",
+      "startMs": 372150,
+      "endMs": 375100,
+      "text": {
+        "ru": "Ты всегда за это голосуешь!",
+        "en": "You always vote for that!"
+      }
+    },
+    {
+      "id": "l91",
+      "role": "r2",
+      "startMs": 376000,
+      "endMs": 379050,
+      "text": {
+        "ru": "Кто выключил свет в коридоре?",
+        "en": "Who turned off the hallway light?"
+      }
+    },
+    {
+      "id": "l92",
+      "role": "r3",
+      "startMs": 383750,
+      "endMs": 386750,
+      "text": {
+        "ru": "Экономия. Я прочитал статью.",
+        "en": "Saving energy. I read an article."
+      },
+      "hint": "гордо"
+    },
+    {
+      "id": "l93",
+      "role": "r1",
+      "startMs": 387650,
+      "endMs": 390450,
+      "text": {
+        "ru": "Я чуть не упала в ведро!",
+        "en": "I nearly fell into a bucket!"
+      }
+    },
+    {
+      "id": "l94",
+      "role": "r2",
+      "startMs": 391350,
+      "endMs": 393550,
+      "text": {
+        "ru": "Какое ведро?",
+        "en": "What bucket?"
+      },
+      "hint": "удивлённо"
+    },
+    {
+      "id": "l95",
+      "role": "r3",
+      "startMs": 394450,
+      "endMs": 397000,
+      "text": {
+        "ru": "Моё ведро для идей.",
+        "en": "My idea bucket."
+      }
+    },
+    {
+      "id": "l96",
+      "role": "r1",
+      "startMs": 397900,
+      "endMs": 400600,
+      "text": {
+        "ru": "У тебя всё «для идей»!",
+        "en": "Everything you own is “for ideas”!"
+      },
+      "hint": "раздражённо"
+    },
+    {
+      "id": "l97",
+      "role": "r2",
+      "startMs": 401500,
+      "endMs": 404450,
+      "text": {
+        "ru": "Тихо, соседка снизу стучит.",
+        "en": "Quiet, the downstairs neighbour is knocking."
+      },
+      "hint": "шёпотом"
+    },
+    {
+      "id": "l98",
+      "role": "r3",
+      "startMs": 405350,
+      "endMs": 408150,
+      "text": {
+        "ru": "Это не соседка, это кот.",
+        "en": "That's not the neighbour, it's the cat."
+      }
+    },
+    {
+      "id": "l99",
+      "role": "r1",
+      "startMs": 412850,
+      "endMs": 415200,
+      "text": {
+        "ru": "У нас нет кота.",
+        "en": "We don't have a cat."
+      }
+    }
+  ],
+  "sync": {
+    "leadInMs": 3000,
+    "videoAudioOffsetMs": 0
+  },
+  "source": {
+    "video": "source/original.mp4",
+    "bed": "source/bed.wav"
+  }
+}
