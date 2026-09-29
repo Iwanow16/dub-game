@@ -220,6 +220,20 @@ function RoomSettingsForm({ settings, editable }: { settings: RoomSettings; edit
           <option value="host">{t("settings.pick.host")}</option>
         </select>
       </label>
+      <label className="dr-field">
+        <span>{t("settings.segment")}</span>
+        <select
+          className="dr-input"
+          value={settings.segment}
+          onChange={(e) => set({ segment: e.target.value as RoomSettings["segment"] })}
+        >
+          <option value="scene">{t("settings.segment.scene")}</option>
+          <option value="full">{t("settings.segment.full")}</option>
+        </select>
+      </label>
+      {settings.segment === "full" && (
+        <p className="dr-muted small">{t("settings.segment.fullHint")}</p>
+      )}
       <label className="check">
         <input
           type="checkbox"

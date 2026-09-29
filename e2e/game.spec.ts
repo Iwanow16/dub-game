@@ -46,7 +46,10 @@ test("three players play a full round", async ({ browser }) => {
     ),
   );
   await host.screenshot({ path: `${SHOTS}/04-pick.png` });
-  await host.locator(".clip-card").first().click();
+  // a short clip (not a scene of a long one) keeps this test fast; long clips: long-clips.spec.ts
+  const short = host.locator(".clip-card").filter({ hasNotText: /Сцена|\d:\d\d/ });
+  if (await short.count()) await short.first().click();
+  else await host.locator(".clip-card").first().click();
 
   // record — everyone records one take and sends it
   const all = [host, ...others];

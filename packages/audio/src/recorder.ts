@@ -55,7 +55,11 @@ export class TakeRecorder {
   private startedAt = 0;
   readonly mime: string;
 
-  constructor(private readonly stream: MediaStream) {
+  constructor(
+    private readonly stream: MediaStream,
+    /** 48 kbit/s for normal clips; long takes use less (see recordingBitrate) */
+    private readonly bitsPerSecond = 48_000,
+  ) {
     const mime = pickRecordingMime((t) => MediaRecorder.isTypeSupported(t));
     if (!mime) throw new Error("MediaRecorder: no supported audio format");
     this.mime = mime;
@@ -64,7 +68,10 @@ export class TakeRecorder {
   /** Resolves when recording has started; `startedAt` is taken at the onstart event. */
   start(): Promise<number> {
     this.chunks = [];
-    this.rec = new MediaRecorder(this.stream, { mimeType: this.mime, audioBitsPerSecond: 48_000 });
+    this.rec = new MediaRecorder(this.stream, {
+      mimeType: this.mime,
+      audioBitsPerSecond: this.bitsPerSecond,
+    });
     this.rec.ondataavailable = (e) => {
       if (e.data.size) this.chunks.push(e.data);
     };

@@ -1,0 +1,202 @@
+{
+  "schema": "dubroom.clip/1",
+  "id": "c_trailerchef1",
+  "slug": "galakticheskiy-povar",
+  "version": 1,
+  "title": {
+    "ru": "Трейлер «Галактический повар»",
+    "en": "“Galactic Chef” trailer"
+  },
+  "durationMs": 150000,
+  "ageRating": "0+",
+  "tags": ["трейлер", "фантастика"],
+  "credit": "DubRoom starter pack (synthetic scene)",
+  "license": "CC0 1.0",
+  "roles": [
+    {
+      "id": "r1",
+      "name": {
+        "ru": "Повар",
+        "en": "Chef"
+      },
+      "color": "#FF8A3D"
+    },
+    {
+      "id": "r2",
+      "name": {
+        "ru": "Штурман",
+        "en": "Navigator"
+      },
+      "color": "#3DA5FF"
+    }
+  ],
+  "lines": [
+    {
+      "id": "l1",
+      "role": "r1",
+      "startMs": 2500,
+      "endMs": 6500,
+      "text": {
+        "ru": "В мире, где еда разучилась быть вкусной…",
+        "en": "In a world where food forgot how to taste good…"
+      },
+      "hint": "эпично"
+    },
+    {
+      "id": "l2",
+      "role": "r1",
+      "startMs": 10100,
+      "endMs": 13785,
+      "text": {
+        "ru": "…один повар отправился к звёздам.",
+        "en": "…one chef set off for the stars."
+      }
+    },
+    {
+      "id": "l3",
+      "role": "r2",
+      "startMs": 18985,
+      "endMs": 22535,
+      "text": {
+        "ru": "Капитан, у нас кончилась соль.",
+        "en": "Captain, we're out of salt."
+      },
+      "hint": "в панике"
+    },
+    {
+      "id": "l4",
+      "role": "r1",
+      "startMs": 26135,
+      "endMs": 29640,
+      "text": {
+        "ru": "Тогда возьмём её с астероида.",
+        "en": "Then we'll take it from an asteroid."
+      },
+      "hint": "спокойно"
+    },
+    {
+      "id": "l5",
+      "role": "r2",
+      "startMs": 33240,
+      "endMs": 37285,
+      "text": {
+        "ru": "Это не астероид. Это гигантская картошка.",
+        "en": "That's not an asteroid. It's a giant potato."
+      }
+    },
+    {
+      "id": "l6",
+      "role": "r1",
+      "startMs": 40885,
+      "endMs": 43535,
+      "text": {
+        "ru": "Тем лучше.",
+        "en": "Even better."
+      },
+      "hint": "довольно"
+    },
+    {
+      "id": "l7",
+      "role": "r2",
+      "startMs": 47135,
+      "endMs": 50640,
+      "text": {
+        "ru": "Сэр, картошка смотрит на нас.",
+        "en": "Sir, the potato is looking at us."
+      },
+      "hint": "шёпотом"
+    },
+    {
+      "id": "l8",
+      "role": "r1",
+      "startMs": 54240,
+      "endMs": 57565,
+      "text": {
+        "ru": "Значит, она тоже голодна.",
+        "en": "Then it's hungry too."
+      }
+    },
+    {
+      "id": "l9",
+      "role": "r2",
+      "startMs": 61165,
+      "endMs": 63950,
+      "text": {
+        "ru": "Мы все умрём!",
+        "en": "We're all going to die!"
+      },
+      "hint": "кричит"
+    },
+    {
+      "id": "l10",
+      "role": "r1",
+      "startMs": 67550,
+      "endMs": 70920,
+      "text": {
+        "ru": "Не сегодня. Сегодня — суп.",
+        "en": "Not today. Today — soup."
+      },
+      "hint": "торжественно"
+    },
+    {
+      "id": "l11",
+      "role": "r2",
+      "startMs": 76120,
+      "endMs": 78815,
+      "text": {
+        "ru": "Этим летом…",
+        "en": "This summer…"
+      },
+      "hint": "голосом диктора"
+    },
+    {
+      "id": "l12",
+      "role": "r2",
+      "startMs": 82415,
+      "endMs": 85155,
+      "text": {
+        "ru": "…один повар…",
+        "en": "…one chef…"
+      }
+    },
+    {
+      "id": "l13",
+      "role": "r2",
+      "startMs": 88755,
+      "endMs": 91630,
+      "text": {
+        "ru": "…одна кастрюля…",
+        "en": "…one pot…"
+      }
+    },
+    {
+      "id": "l14",
+      "role": "r2",
+      "startMs": 95230,
+      "endMs": 98420,
+      "text": {
+        "ru": "…и очень много укропа.",
+        "en": "…and a lot of dill."
+      }
+    },
+    {
+      "id": "l15",
+      "role": "r1",
+      "startMs": 102020,
+      "endMs": 105930,
+      "text": {
+        "ru": "Галактический повар. В кино с пятницы.",
+        "en": "Galactic Chef. In cinemas Friday."
+      },
+      "hint": "эпично"
+    }
+  ],
+  "sync": {
+    "leadInMs": 3000,
+    "videoAudioOffsetMs": 0
+  },
+  "source": {
+    "video": "source/original.mp4",
+    "bed": "source/bed.wav"
+  }
+}

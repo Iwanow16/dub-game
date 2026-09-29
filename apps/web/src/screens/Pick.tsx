@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { localized, type CatalogEntry, type RoomSnapshot } from "@dubroom/shared";
+import { localized, type Playable, type RoomSnapshot } from "@dubroom/shared";
 import { Avatar } from "@dubroom/ui";
 import { game } from "../net/client.ts";
 import { selectMe, useGame } from "../net/store.ts";
@@ -51,7 +51,7 @@ function ClipCard({
   voters,
   onPick,
 }: {
-  clip: CatalogEntry;
+  clip: Playable;
   selected: boolean;
   disabled: boolean;
   voters: RoomSnapshot["players"];
@@ -81,8 +81,12 @@ function ClipCard({
       </div>
       <strong className="clip-card__title">{localized(clip.title, lang)}</strong>
       <span className="dr-muted">
-        {t("pick.sec", { n: Math.round(clip.durationMs / 1000) })} ·{" "}
-        {t("pick.roles", { n: clip.rolesCount })}
+        {clip.scene
+          ? t("pick.scene", { i: clip.sceneIndex, n: clip.sceneCount }) + " · "
+          : clip.sceneCount > 0
+            ? `${t("pick.whole")} · `
+            : ""}
+        {fmtDuration(clip.durationMs, t)} · {t("pick.roles", { n: clip.rolesCount })}
       </span>
       <span className="clip-card__voters">
         {voters.map((p) => (
@@ -91,4 +95,13 @@ function ClipCard({
       </span>
     </button>
   );
+}
+
+function fmtDuration(ms: number, t: ReturnType<typeof useT>): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return t("pick.sec", { n: s });
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }

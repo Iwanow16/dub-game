@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { RoomSnapshot } from "@dubroom/shared";
+import { maxAttempts, type RoomSnapshot } from "@dubroom/shared";
 import { PlayerCard, useToast } from "@dubroom/ui";
 import { game } from "../net/client.ts";
 import { selectMe, useGame } from "../net/store.ts";
@@ -61,6 +61,7 @@ function RecordTake({ room }: { room: RoomSnapshot }) {
 
   return (
     <div className="record">
+      {maxAttempts(r.clip!.durationMs) === 1 && <p className="dr-muted center">{t("rec.long")}</p>}
       <RecordingFlow
         clipEntry={r.clip!}
         myRoles={myRoles}
