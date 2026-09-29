@@ -12,3 +12,4 @@
 | [0006](0006-upload-tickets-and-dub-receipts.md) | Подписанные тикеты и квитанции вместо presigned URL | принято |
 | [0007](0007-synthetic-starter-pack.md) | Синтетический стартовый набор клипов в git | принято |
 | [0008](0008-git-flow.md) | Git Flow и Conventional Commits | принято |
+| [0009](0009-long-clips-scenes-and-streaming.md) | Клипы любой длины: сцены и потоковый режим | принято |
