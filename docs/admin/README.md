@@ -81,7 +81,7 @@ sudo ./scripts/tunnel.sh access
 
 **Вручную:** Zero Trust → **Access → Applications → Add → Self-hosted**, домен `studio.<домен>`, сессия 12 ч, политика *Allow* → *Emails* — список авторов. Скопируйте *Application Audience (AUD) Tag* и team domain в `.env` (`CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`) → `sudo ./scripts/restart.sh`.
 
-Добавить автора — допишите e-mail в политику. Кроме Access, Studio спрашивает **ключ** (`STUDIO_KEY` в `.env`) — передайте его авторам.
+Добавить автора — допишите e-mail в политику. Для **блокнота Colab** и CLI (`dubroom-clip publish`), которые работают без браузера: Zero Trust → Access → Service Auth → «Create Service Token», затем в приложении Studio добавьте политику с действием **Service Auth** и этим токеном. Client ID и Secret автор сохраняет в секретах Colab `CF_ACCESS_CLIENT_ID` и `CF_ACCESS_CLIENT_SECRET`. Кроме Access, Studio спрашивает **ключ** (`STUDIO_KEY` в `.env`) — передайте его авторам.
 
 ## 6. Кеширование, HTTPS и защита на стороне Cloudflare
 
