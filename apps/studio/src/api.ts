@@ -115,6 +115,8 @@ export const api = {
   unarchive: (clipId: string) => call(`/clips/${clipId}/unarchive`, { method: "POST" }),
   reports: () => call<{ reports: Report[] }>("/reports"),
   resolveReport: (id: string) => call(`/reports/${id}/resolve`, { method: "POST" }),
+  /** Signed URLs for the editing proxy and its peaks: long sources stream instead of downloading. */
+  mediaLink: (id: string) => call<{ proxy: string; peaks: string }>(`/drafts/${id}/media-link`),
 
   /** Fetches an uploaded source (needs the auth header, so no plain <video src>). */
   async sourceBlob(id: string, kind: SourceKind | "proxy"): Promise<Blob> {
