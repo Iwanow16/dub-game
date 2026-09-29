@@ -7,7 +7,7 @@
 1. **Create a room** on the home page — or open a link from a friend, or type the 5-character code.
 2. **Name and avatar.** Pick a name (2–20 characters) and build an avatar, or hit “🎲 Random”. Next time it's remembered.
 3. **Sound check.** Put on headphones 🎧, allow the microphone and clap along with four clicks once — this keeps your voice on the character's lips.
-4. **Pick a clip.** Everyone votes for one of three clips (or the host picks).
+4. **Pick a clip.** Everyone votes for one of three clips (or the host picks). Long clips — game trailers, cuts from TV series — are played one scene per round; the host can switch **Long clips → whole** to play them start to finish.
 5. **Record.** Rehearse if you like, then 3-2-1 and speak the lines shown at the bottom. The bar fills up one second before each line. You get two takes. Before sending, listen back, choose an effect (robot, bass, echo, radio, chipmunk) and nudge the sync if needed.
 6. **Watch.** All takes play for everyone at the same time. Send reactions 😂 👏 🔥.
 7. **Vote** for the best take (not your own). You can change your mind until the timer ends.
