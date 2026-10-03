@@ -51,7 +51,7 @@ if [[ $STUDIO == 1 ]]; then
   changed+=("ключ Clip Studio: $key")
 fi
 if [[ -n $TUNNEL ]]; then
-  env_set "$ENV_FILE" TUNNEL_TOKEN "$TUNNEL"
+  env_set "$ENV_FILE" TUNNEL_TOKEN "$(clean_tunnel_token "$TUNNEL")"
   changed+=("токен туннеля")
 fi
 

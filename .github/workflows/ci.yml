@@ -38,6 +38,7 @@ jobs:
       - run: shellcheck scripts/*.sh scripts/lib/*.sh
         env:
           LANG: C.UTF-8
+      - run: for t in scripts/tests/*.test.sh; do bash "$t"; done
 
   images:
     runs-on: ubuntu-24.04
