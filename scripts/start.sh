@@ -38,12 +38,18 @@ compose up -d --remove-orphans
 
 if [[ $WAIT == 1 ]]; then
   info "жду готовности сервисов (до 3 минут на медленном сервере)…"
+  # the game itself (api, game-server, caddy) must come up; the tunnel may connect later and only
+  # gets a warning — on slow boards and filtered networks it takes its time
   for i in $(seq 1 90); do
-    unhealthy=$(compose ps --format '{{.Service}} {{.Health}}' | awk '$2 != "" && $2 != "healthy" {print $1}' | sort -u)
+    unhealthy=$(compose ps --format '{{.Service}} {{.Health}}' | awk '$2 != "" && $2 != "healthy" && $1 != "cloudflared" {print $1}' | sort -u)
     [[ -z $unhealthy ]] && break
     ((i == 90)) && die "не поднялись: $unhealthy — ./scripts/logs.sh <сервис>"
     sleep 2
   done
+  tunnel_health=$(compose ps cloudflared --format '{{.Health}}' 2>/dev/null | head -n1 || true)
+  if [[ -n $tunnel_health && $tunnel_health != healthy ]]; then
+    warn "туннель ещё подключается (${tunnel_health}) — игра на сервере уже работает; проверка: ./scripts/tunnel.sh info"
+  fi
   while read -r svc health; do ok "$svc${health:+ ($health)}"; done < <(compose ps --format '{{.Service}} {{.Health}}' | sort -u)
 fi
 
