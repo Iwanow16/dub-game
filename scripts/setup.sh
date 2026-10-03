@@ -50,6 +50,9 @@ fi
 if [[ $TUNNEL_MODE == token ]]; then
   ask_secret TUNNEL_TOKEN "TUNNEL_TOKEN (Zero Trust → Networks → Tunnels → Install connector)"
   [[ -n ${TUNNEL_TOKEN:-} ]] || die "TUNNEL_TOKEN обязателен в режиме token"
+  TUNNEL_TOKEN=$(clean_tunnel_token "$TUNNEL_TOKEN")
+  [[ $TUNNEL_TOKEN =~ ^eyJ[A-Za-z0-9_=+/-]+$ ]] ||
+    die "это не похоже на токен туннеля: нужна длинная строка, начинающаяся с eyJ (после --token в команде установки)"
 fi
 ask AUTHOR_EMAILS "Email-ы авторов Clip Studio для Cloudflare Access (через запятую, можно позже)" ""
 

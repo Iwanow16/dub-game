@@ -99,13 +99,32 @@ env_set() {
   rm -f "$tmp"
 }
 
-# Loads .env into the environment (for scripts that need its values).
+# Loads .env into the environment (for scripts that need its values). The file is parsed, not
+# sourced: it is a docker compose env file, where `KEY=a b c` is a plain value — bash would run
+# `b` as a command (TUNNEL_COMMAND=tunnel --no-autoupdate … broke start.sh in 0.2.0).
 load_env() {
   [[ -r $ENV_FILE ]] || die "нет $ENV_FILE — сначала запустите scripts/setup.sh"
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
+  local line key value
+  while IFS= read -r line || [[ -n $line ]]; do
+    line=${line%$'\r'}
+    [[ $line =~ ^[[:space:]]*(#|$) ]] && continue
+    if [[ ! $line =~ ^[[:space:]]*(export[[:space:]]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
+      warn "$ENV_FILE: пропущена непонятная строка «${line:0:30}…»"
+      continue
+    fi
+    key=${BASH_REMATCH[2]} value=${BASH_REMATCH[3]}
+    # one pair of surrounding quotes is stripped, as docker compose does
+    if [[ $value =~ ^\"(.*)\"$ || $value =~ ^\'(.*)\'$ ]]; then value=${BASH_REMATCH[1]}; fi
+    export "$key=$value"
+  done <"$ENV_FILE"
+}
+
+# clean_tunnel_token VALUE — the token itself, also when the whole install command from the
+# Cloudflare dashboard was pasted ("cloudflared service install eyJ…" / "… run --token eyJ…")
+clean_tunnel_token() {
+  local t
+  t=$(grep -oE 'eyJ[A-Za-z0-9_=+/-]{20,}' <<<"$1" | head -n1 || true)
+  printf '%s' "${t:-$1}"
 }
 
 # docker compose with the project's files; adds the tunnel profile and, for local-only or quick
