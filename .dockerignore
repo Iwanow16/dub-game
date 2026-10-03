@@ -1,0 +1,18 @@
+# Build context = the installation directory (/opt/dubroom): keep secrets, data and backups out
+.env
+.env.*
+data/
+.data/
+backups/
+infra/cloudflared/*.json
+# not needed to build the images
+.git/
+**/node_modules/
+**/dist/
+test-results/
+playwright-report/
+e2e/
+tools/colab/
+**/*.log
+**/.pytest_cache/
+**/__pycache__/
