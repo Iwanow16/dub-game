@@ -77,16 +77,23 @@ fi
 systemctl enable --now docker >/dev/null
 ok "$(docker --version), $(docker compose version --short)"
 
+# the tunnel itself runs in a container; the host binary is only needed for mode B (tunnel.sh create)
 step "cloudflared"
-if ! have cloudflared; then
+install_cloudflared() {
   install -d -m 0755 /usr/share/keyrings
-  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg
-  echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
-    >/etc/apt/sources.list.d/cloudflared.list
-  apt-get update -qq
-  apt-get install -y -qq cloudflared >/dev/null
+  curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /usr/share/keyrings/cloudflare-main.gpg &&
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main" \
+      >/etc/apt/sources.list.d/cloudflared.list &&
+    apt-get update -qq &&
+    apt-get install -y -qq cloudflared >/dev/null
+}
+if have cloudflared || install_cloudflared; then
+  ok "$(cloudflared --version 2>&1 | head -1)"
+else
+  rm -f /etc/apt/sources.list.d/cloudflared.list
+  warn "cloudflared не установлен на сервер (pkg.cloudflare.com недоступен) — он нужен только для режима B;"
+  warn "режимы token и quick используют контейнер cloudflare/cloudflared"
 fi
-ok "$(cloudflared --version 2>&1 | head -1)"
 
 step "Пользователь и каталоги"
 if ! id dubroom >/dev/null 2>&1; then

@@ -45,17 +45,18 @@ if [[ $WAIT == 1 ]]; then
 fi
 
 if [[ ${TUNNEL_MODE:-} == quick ]]; then
-  for _ in $(seq 1 30); do
-    url=$(compose logs cloudflared 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)
-    [[ -n $url ]] && break
-    sleep 2
-  done
-  [[ -n ${url:-} ]] && env_set "$ENV_FILE" PUBLIC_URL "$url"
-  PUBLIC_URL=${url:-}
+  refresh_quick_url 90
+  [[ -n $PUBLIC_URL ]] || warn "быстрый туннель не выдал адрес — ./scripts/logs.sh cloudflared (trycloudflare.com бывает недоступен; повторите ./scripts/restart.sh)"
 fi
 
 if [[ -n ${PUBLIC_URL:-} && ${PUBLIC_URL} == https://* ]]; then
-  if wait_http "${PUBLIC_URL}/api/health" 60; then ok "публичный адрес отвечает"; else warn "${PUBLIC_URL} пока не отвечает — проверьте туннель: ./scripts/tunnel.sh info"; fi
+  if wait_http "${PUBLIC_URL}/api/health" 90; then
+    ok "публичный адрес отвечает"
+  elif [[ ${TUNNEL_MODE:-} == quick ]]; then
+    warn "новый адрес быстрого туннеля пока не открывается — обычно он начинает работать через 1–2 минуты"
+  else
+    warn "${PUBLIC_URL} пока не отвечает — проверьте туннель: ./scripts/tunnel.sh info"
+  fi
 fi
 printf '\n'
 info "Игра:        ${PUBLIC_URL:-http://localhost:8080}"
