@@ -101,6 +101,7 @@ set_default DUBROOM_VERSION "$(cat "$INSTALL_DIR/VERSION" 2>/dev/null || echo lo
 set_default DUBROOM_IMAGE dubroom/app
 set_default DUBROOM_CADDY_IMAGE dubroom/caddy
 set_default CLOUDFLARED_VERSION 2025.9.1
+set_default TUNNEL_PROTOCOL http2
 set_default MAX_ROOMS 500
 set_default DRAIN_SECONDS 300
 set_default JOB_TIMEOUT_MIN 10

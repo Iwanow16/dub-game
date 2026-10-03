@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [0.2.7] — 2026-10-03
+
+### Исправлено
+- Туннель не работал в сетях, где провайдер или роутер режет QUIC (UDP 7844): `cloudflared` получал адрес, но оставался `unhealthy` (`Failed to dial a quic connection … no recent network activity`). По умолчанию теперь HTTP/2 по TCP 7844 (`TUNNEL_PROTOCOL=http2` в `.env`; `quic` или `auto` — вернуть прежнее поведение).
+
 ## [0.2.6] — 2026-10-03
 
 ### Исправлено
