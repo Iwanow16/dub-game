@@ -129,13 +129,15 @@ services:
     depends_on: [caddy]
     deploy:
       replicas: ${TUNNEL_REPLICAS:-2}
-      resources: { limits: { cpus: "0.5", memory: 128M } }
+      resources: { limits: { cpus: "1.0", memory: 128M } }
+    # the probe starts a second cloudflared process (37 MB binary): on a slow ARM board with a CPU
+    # quota that alone took longer than a short timeout, so the tunnel looked unhealthy while serving
     healthcheck:
       test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
-      interval: 30s
-      timeout: 5s
+      interval: 60s
+      timeout: 30s
       retries: 3
-      start_period: 60s
+      start_period: 120s
 
 networks:
   # only cloudflared reaches the internet; everything else is internal (§22.5)
