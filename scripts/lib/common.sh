@@ -157,6 +157,42 @@ notify() {
 }
 
 # wait_http URL [timeout_s]
+# SHA-256 of cloudflared release binaries for 32-bit ARM, per version (github.com/cloudflare/cloudflared)
+declare -A CLOUDFLARED_SHA256_ARMHF=([2025.9.1]=f4d4829c83323e95b9b7bf733b904f8d039d9a01a58ef50d524414f2f1d02fe6)
+declare -A CLOUDFLARED_SHA256_ARM=([2025.9.1]=ecef68497b742bfd09d64718b5fa94e16b086253d5024da60faf6ab72afe93c1)
+
+# ensure_cloudflared_image — the official image has no 32-bit ARM variant ("no matching manifest
+# for linux/arm/v7"); there, build dubroom/cloudflared from the release binary. The Docker
+# server's arch decides: a Raspberry Pi with a 64-bit kernel and 32-bit OS reports aarch64 in
+# uname but runs a 32-bit ("arm") Docker.
+ensure_cloudflared_image() {
+  local mode arch asset sha ver
+  mode=$(env_get "$ENV_FILE" TUNNEL_MODE)
+  [[ $mode == token || $mode == local || $mode == quick ]] || return 0
+  arch=${DUBROOM_DOCKER_ARCH:-$(docker version --format '{{.Server.Arch}}' 2>/dev/null || true)}
+  [[ $arch == arm ]] || return 0
+  ver=$(env_get "$ENV_FILE" CLOUDFLARED_VERSION)
+  ver=${ver:-2025.9.1}
+  if [[ $(uname -m) == armv6* ]]; then
+    asset=cloudflared-linux-arm
+    sha=${CLOUDFLARED_SHA256_ARM[$ver]:-}
+  else
+    asset=cloudflared-linux-armhf
+    sha=${CLOUDFLARED_SHA256_ARMHF[$ver]:-}
+  fi
+  sha=$(env_get "$ENV_FILE" CLOUDFLARED_SHA256 | grep . || printf '%s' "$sha")
+  [[ -n $sha ]] || die "для cloudflared ${ver} (${asset}) нет контрольной суммы: укажите CLOUDFLARED_SHA256 в .env или CLOUDFLARED_VERSION=2025.9.1"
+  [[ $(env_get "$ENV_FILE" CLOUDFLARED_IMAGE) == dubroom/cloudflared ]] || env_set "$ENV_FILE" CLOUDFLARED_IMAGE dubroom/cloudflared
+  export CLOUDFLARED_IMAGE=dubroom/cloudflared
+  docker image inspect "dubroom/cloudflared:${ver}" >/dev/null 2>&1 && return 0
+  step "Образ cloudflared для 32-битного ARM (${asset} ${ver})"
+  docker build --target cloudflared \
+    --build-arg "CLOUDFLARED_VERSION=${ver}" --build-arg "CLOUDFLARED_ASSET=${asset}" \
+    --build-arg "CLOUDFLARED_SHA256=${sha}" \
+    -t "dubroom/cloudflared:${ver}" -f "${INSTALL_DIR}/infra/Dockerfile" "${INSTALL_DIR}"
+  ok "dubroom/cloudflared:${ver}"
+}
+
 # quick_tunnel_url — address of the running quick tunnel, taken from the CURRENT run of the
 # cloudflared container only: after a restart the old address is still in its log
 quick_tunnel_url() {

@@ -32,6 +32,7 @@ step "Проверка системы"
 . /etc/os-release
 case "${ID}:${VERSION_ID}" in
   ubuntu:24.04 | debian:12) ok "ОС: ${PRETTY_NAME}" ;;
+  raspbian:*) warn "${PRETTY_NAME}: 32-битная система — работает, но лучше 64-битная Raspberry Pi OS (docs/admin/README.md §1)" ;;
   ubuntu:* | debian:*) warn "ОС ${PRETTY_NAME} не проверялась — поддерживаются Ubuntu 24.04 и Debian 12" ;;
   *) die "нужна Ubuntu 24.04 или Debian 12 (найдено: ${PRETTY_NAME})" ;;
 esac
