@@ -60,6 +60,7 @@ git checkout -q "$REF"
 env_set "$ENV_FILE" DUBROOM_VERSION "$new_version"
 load_env
 compose build
+ensure_cloudflared_image
 
 step "Перезапуск"
 # api applies database migrations on start; worker and proxy follow

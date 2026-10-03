@@ -30,6 +30,8 @@ if [[ $BUILD == 1 ]] || ! docker image inspect "$image" >/dev/null 2>&1; then
   compose build
 fi
 
+ensure_cloudflared_image
+
 rm -f "${DATA_DIR}/public/maintenance"
 step "Запуск"
 compose up -d --remove-orphans

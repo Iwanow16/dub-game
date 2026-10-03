@@ -55,3 +55,18 @@ COPY --from=build /src/apps/studio/dist /srv/studio
 COPY --from=build /src/apps/help/dist /srv/help
 ENV XDG_CONFIG_HOME=/tmp/caddy XDG_DATA_HOME=/tmp/caddy
 USER 10001:10001
+
+# ---------- cloudflared for 32-bit ARM ----------
+# The official cloudflare/cloudflared image is published for amd64 and arm64 only. On armhf/armv6
+# servers (Raspberry Pi OS 32-bit and similar) scripts/lib/common.sh builds this target from the
+# release binary, pinned by its SHA-256.
+FROM ${CADDY_IMAGE} AS cloudflared
+ARG CLOUDFLARED_VERSION
+ARG CLOUDFLARED_ASSET
+ARG CLOUDFLARED_SHA256
+ADD --checksum=sha256:${CLOUDFLARED_SHA256} --chmod=755 \
+  https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/${CLOUDFLARED_ASSET} \
+  /usr/local/bin/cloudflared
+USER 65532:65532
+ENTRYPOINT ["cloudflared", "--no-autoupdate"]
+CMD ["version"]
