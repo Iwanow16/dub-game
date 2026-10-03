@@ -63,7 +63,7 @@ fi
 if [[ -n ${PUBLIC_URL:-} && ${PUBLIC_URL} == https://* ]]; then
   if curl -fsS -m 10 -o /dev/null "${PUBLIC_URL}/api/health" 2>/dev/null; then good "${PUBLIC_URL} отвечает"; else bad "${PUBLIC_URL} не отвечает (туннель, DNS или сервисы)"; fi
 fi
-if compose exec -T api wget -q -O /dev/null http://localhost:3000/api/health 2>/dev/null; then good "API"; else bad "API не отвечает внутри сети"; fi
+if compose exec -T api wget -q -O /dev/null http://127.0.0.1:3000/api/health 2>/dev/null; then good "API"; else bad "API не отвечает внутри сети"; fi
 
 [[ $QUIET == 1 ]] || step "Данные"
 db="${DATA_DIR}/db/dubroom.sqlite"
