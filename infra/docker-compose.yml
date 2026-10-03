@@ -120,6 +120,9 @@ services:
     command: ${TUNNEL_COMMAND:-tunnel --no-autoupdate --metrics 0.0.0.0:2000 run}
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+      # http2 (TCP 7844) by default: QUIC (UDP 7844) is throttled or dropped by many ISPs and home
+      # routers — the tunnel registers and then times out. TUNNEL_PROTOCOL=auto|quic to change.
+      TUNNEL_TRANSPORT_PROTOCOL: ${TUNNEL_PROTOCOL:-http2}
     volumes:
       - ./infra/cloudflared:/etc/cloudflared:ro
     networks: [edge]

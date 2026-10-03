@@ -166,6 +166,7 @@ sudo ./scripts/rotate-secrets.sh --all      # раз в 90 дней и при п
 | Симптом | Что проверить |
 |---|---|
 | Не пускает по SSH после `harden.sh` | вход через веб-консоль хостинга → [security.md, «Потерян доступ по SSH»](security.md#ssh-lockout) |
+| `cloudflared` unhealthy, в логе `Failed to dial a quic connection … no recent network activity` | провайдер или роутер режет QUIC (UDP 7844). С 0.2.7 по умолчанию `TUNNEL_PROTOCOL=http2` (TCP 7844); проверьте `.env` и `./scripts/restart.sh` |
 | Туннель «down» в панели | `./scripts/tunnel.sh info`, `./scripts/logs.sh cloudflared`; токен не отозван? исходящий 443/7844 не закрыт (`harden.sh --strict-egress` разрешает оба) |
 | 502 от Cloudflare | сервисы не поднялись: `./scripts/status.sh`, `./scripts/logs.sh caddy` |
 | Закончилось место | `df -h`; старые бэкапы — `/opt/dubroom/backups`; черновики Studio — удалить в Studio; `docker system prune` |
