@@ -41,6 +41,8 @@ case $cmd in
     token=${1:-}
     [[ -n $token ]] || ask_secret token "новый TUNNEL_TOKEN"
     [[ -n $token ]] || die "токен не задан"
+    token=$(clean_tunnel_token "$token")
+    [[ $token =~ ^eyJ[A-Za-z0-9_=+/-]+$ ]] || die "это не похоже на токен туннеля (строка, начинающаяся с eyJ)"
     env_set "$ENV_FILE" TUNNEL_MODE token
     env_set "$ENV_FILE" TUNNEL_TOKEN "$token"
     env_set "$ENV_FILE" TUNNEL_COMMAND "tunnel --no-autoupdate --metrics 0.0.0.0:2000 run"
