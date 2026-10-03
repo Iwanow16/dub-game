@@ -157,10 +157,34 @@ notify() {
 }
 
 # wait_http URL [timeout_s]
+# quick_tunnel_url — address of the running quick tunnel, taken from the CURRENT run of the
+# cloudflared container only: after a restart the old address is still in its log
+quick_tunnel_url() {
+  local id started
+  id=$(compose ps -q cloudflared 2>/dev/null | head -n1 || true)
+  [[ -n $id ]] || return 0
+  started=$(docker inspect -f '{{.State.StartedAt}}' "$id" 2>/dev/null || true)
+  docker logs ${started:+--since "$started"} "$id" 2>&1 |
+    grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -n1 || true
+}
+
+# refresh_quick_url [wait_s] — waits for the quick tunnel address and stores it as PUBLIC_URL
+refresh_quick_url() {
+  local wait=${1:-60} waited=0 url=""
+  while :; do
+    url=$(quick_tunnel_url)
+    [[ -n $url ]] || ((waited >= wait)) && break
+    sleep 2
+    waited=$((waited + 2))
+  done
+  if [[ -n $url && $url != "$(env_get "$ENV_FILE" PUBLIC_URL)" ]]; then env_set "$ENV_FILE" PUBLIC_URL "$url"; fi
+  PUBLIC_URL=${url:-}
+}
+
 wait_http() {
   local url=$1 timeout=${2:-60} i
   for ((i = 0; i < timeout; i++)); do
-    if curl -fsS -o /dev/null --max-time 3 "$url"; then return 0; fi
+    if curl -fsS -o /dev/null --max-time 3 "$url" 2>/dev/null; then return 0; fi
     sleep 1
   done
   return 1

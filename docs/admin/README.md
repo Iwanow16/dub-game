@@ -31,6 +31,10 @@
 | **B. Локальный** | конфигурация в git | `setup.sh` сам вызовет `./scripts/tunnel.sh create`: вход в Cloudflare через браузер, создание туннеля, DNS-маршруты и `infra/cloudflared/config.yml`. |
 | **C. Быстрый** | демо, тест с друзьями | ничего не нужно; адрес `https://….trycloudflare.com` выдаётся при каждом запуске. Clip Studio доступна только с сервера: `ssh -L 8080:127.0.0.1:8080 сервер` → http://studio.localhost:8080. |
 
+**Быстрый туннель (C) подробнее.** `cloudflared` сам получает адрес `https://<слова>.trycloudflare.com`; `start.sh` берёт его из лога текущего запуска контейнера, сохраняет в `.env` (`PUBLIC_URL`) и печатает. Адрес **меняется при каждом перезапуске** `cloudflared` — после перезагрузки сервера, `restart.sh`, `update.sh` или падения контейнера; новый адрес начинает открываться через 1–2 минуты. Узнать текущий: `sudo ./scripts/tunnel.sh info`. Если настроены уведомления (`NOTIFY_TELEGRAM_*`), `status.sh` из cron пришлёт новый адрес сам. Сервер без DNS-записей и аккаунта Cloudflare; на хост `cloudflared` ставить не обязательно (туннель работает в контейнере).
+
+Переход с быстрого туннеля на свой домен: создайте туннель в панели (режим A, Public Hostnames `play.` и `studio.`), затем `sudo ./scripts/tunnel.sh token` — скрипт спросит домен (или `NEW_DOMAIN=example.com sudo -E ./scripts/tunnel.sh token <TOKEN>`). Обратно — `sudo ./scripts/tunnel.sh quick`.
+
 Токен туннеля — секрет: он хранится только в `/opt/dubroom/.env`.
 
 ## 4. Установка

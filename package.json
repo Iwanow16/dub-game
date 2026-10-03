@@ -2,7 +2,7 @@
   "name": "dubroom",
   "private": true,
   "type": "module",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "DubRoom — browser party game: re-dub movie clips with friends",
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
