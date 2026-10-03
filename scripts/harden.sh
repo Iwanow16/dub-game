@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 # Baseline server hardening (§22.2–22.5, §22.11). Idempotent; safe to re-run. Called by setup.sh.
 #
-#   sudo ./scripts/harden.sh [--yes] [--ssh-mode access|classic] [--strict-egress] [--dry-run]
-#     --ssh-mode access   (default) SSH only through Cloudflare Access: port 22 closed in ufw
-#     --ssh-mode classic  port 22 open, keys only, fail2ban
+#   sudo ./scripts/harden.sh [--yes] [--ssh-mode classic|access] [--strict-egress] [--dry-run]
+#     --ssh-mode classic  (default) port 22 open (rate-limited), keys only, fail2ban
+#     --ssh-mode access   port 22 closed; only if you already log in through Cloudflare Access
+#                         (`cloudflared access ssh`) — asks for confirmation, never with --yes
 #     --strict-egress     outbound only DNS, NTP, HTTP(S), Cloudflare tunnel (7844), SMTP
 #     --dry-run           show what would change
 #
-# Lock-out protection: sshd is only reconfigured if the invoking admin has a working key and is
-# in the ssh-admins group, the new config passes `sshd -t`, and sshd is reloaded (not restarted),
-# so the current session stays open. Keep it open until a new login works.
+# Lock-out protection: password logins are only switched off if the invoking admin has a key in
+# authorized_keys AND their last SSH login used a key (or they confirm interactively); the config
+# must pass `sshd -t`; sshd is reloaded (the current session stays open); interactively, SSH and
+# firewall changes roll back by themselves in 10 minutes unless a new login is confirmed.
 # shellcheck source=lib/common.sh
 source "$(dirname "$0")/lib/common.sh"
 
-SSH_MODE=access
+SSH_MODE=classic
 STRICT=0
 DRY=0
 while [[ $# -gt 0 ]]; do
@@ -107,9 +109,36 @@ then
   warn "/tmp станет noexec после перезагрузки"
 fi
 
+# Interactive runs: undo the SSH and firewall changes in 10 minutes unless a new login is confirmed
+ROLLBACK_UNIT=dubroom-ssh-rollback
+rollback_armed=0
+arm_rollback() {
+  [[ $DRY == 1 || $ASSUME_YES == 1 || $rollback_armed == 1 ]] && return 0
+  systemctl stop "$ROLLBACK_UNIT.timer" "$ROLLBACK_UNIT.service" >/dev/null 2>&1 || true
+  systemd-run --quiet --unit "$ROLLBACK_UNIT" --on-active=600 /bin/sh -c \
+    'rm -f /etc/ssh/sshd_config.d/90-dubroom.conf; systemctl reload ssh || systemctl reload sshd; ufw limit 22/tcp' &&
+    rollback_armed=1 &&
+    warn "страховка: через 10 минут SSH и фаервол вернутся как были, если не подтвердить новый вход"
+}
+
 step "SSH (режим: $SSH_MODE)"
+if [[ $SSH_MODE == access ]]; then
+  [[ $ASSUME_YES != 1 ]] || die "--ssh-mode access закрывает порт 22 и не применяется с --yes: запустите без --yes"
+  warn "порт 22 будет закрыт: войти можно будет только через Cloudflare Access (cloudflared access ssh)"
+  confirm "Вы уже входили на этот сервер через Cloudflare Access?" || {
+    SSH_MODE=classic
+    warn "оставляю порт 22 открытым (режим classic)"
+  }
+fi
 admin=${SUDO_USER:-}
 key_ok=0
+ssh_changed=0
+
+# how did the admin log in last time: publickey | password | keyboard-interactive/pam | ""
+last_ssh_auth() {
+  { [[ -r ${AUTH_LOG:-/var/log/auth.log} ]] && cat "${AUTH_LOG:-/var/log/auth.log}"; } 2>/dev/null ||
+    journalctl -q --no-pager -t sshd -t sshd-session -n 5000 2>/dev/null || true
+}
 if [[ -n $admin && $admin != root ]]; then
   home=$(getent passwd "$admin" | cut -d: -f6)
   if [[ -s $home/.ssh/authorized_keys ]] && grep -qE '^(ssh-ed25519|sk-ssh-ed25519|ecdsa-sha2|sk-ecdsa|ssh-rsa) ' "$home/.ssh/authorized_keys"; then
@@ -118,9 +147,21 @@ if [[ -n $admin && $admin != root ]]; then
   getent group ssh-admins >/dev/null || run groupadd ssh-admins
   id -nG "$admin" | grep -qw ssh-admins || run usermod -aG ssh-admins "$admin"
 fi
+if [[ $key_ok == 1 ]]; then
+  method=$(last_ssh_auth | grep -oE "Accepted [a-z/-]+ for ${admin} from" | tail -n1 | awk '{print $2}' || true)
+  if [[ $method != publickey ]]; then
+    warn "последний вход ${admin} по SSH: ${method:-неизвестно как} — не по ключу"
+    info "ключи в ~${admin}/.ssh/authorized_keys:"
+    ssh-keygen -lf "$home/.ssh/authorized_keys" 2>/dev/null | sed 's/^/    /' || true
+    info "часто это ключ, который добавил хостинг при создании сервера, — а у вас его может не быть"
+    if [[ $ASSUME_YES == 1 ]] || ! confirm "Входить можно будет ТОЛЬКО по одному из этих ключей. Он есть у вас на компьютере?"; then
+      key_ok=0
+    fi
+  fi
+fi
 if [[ $key_ok != 1 ]]; then
-  warn "у администратора (${admin:-root}) нет SSH-ключа в authorized_keys — sshd не меняю, чтобы не потерять доступ"
-  warn "добавьте ключ Ed25519 и запустите harden.sh снова (docs/admin/security.md)"
+  warn "вход по паролю НЕ отключён: нет подтверждённого SSH-ключа у ${admin:-root} (защита от потери доступа)"
+  warn "добавьте свой ключ (ssh-copy-id), войдите по нему и запустите harden.sh снова (docs/admin/security.md)"
 else
   if write_file /etc/ssh/sshd_config.d/90-dubroom.conf 644 <<'EOF'
 PermitRootLogin no
@@ -139,6 +180,8 @@ AllowTcpForwarding no
 EOF
   then
     if [[ $DRY == 1 ]] || sshd -t; then
+      arm_rollback
+      ssh_changed=1
       run systemctl reload ssh 2>/dev/null || run systemctl reload sshd
       ok "sshd: только ключи, группа ssh-admins (текущая сессия не закрыта — проверьте новый вход!)"
     else
@@ -157,6 +200,7 @@ run ufw --force default allow outgoing >/dev/null
 if [[ $SSH_MODE == classic ]]; then
   run ufw limit 22/tcp comment 'ssh' >/dev/null
 else
+  arm_rollback
   # SSH через Cloudflare Access: cloudflared ходит к sshd локально, снаружи порт закрыт
   run ufw delete limit 22/tcp >/dev/null 2>&1 || true
   run ufw delete allow 22/tcp >/dev/null 2>&1 || true
@@ -229,5 +273,20 @@ step "Права на файлы сервиса"
 [[ -f $ENV_FILE ]] && run chmod 600 "$ENV_FILE" && run chown root:root "$ENV_FILE"
 [[ -d $INSTALL_DIR/backups ]] && run chmod 700 "$INSTALL_DIR/backups"
 ok ".env 600, backups 700"
+
+if [[ $rollback_armed == 1 ]]; then
+  step "Проверка входа"
+  info "НЕ закрывайте это окно. Откройте второе и войдите заново: ssh ${admin}@<адрес сервера>"
+  if confirm "Новый вход по SSH работает?"; then
+    systemctl stop "$ROLLBACK_UNIT.timer" "$ROLLBACK_UNIT.service" >/dev/null 2>&1 || true
+    ok "настройки SSH закреплены"
+  else
+    systemctl start "$ROLLBACK_UNIT.service" >/dev/null 2>&1 || true
+    systemctl stop "$ROLLBACK_UNIT.timer" >/dev/null 2>&1 || true
+    warn "SSH и фаервол возвращены как были (вход по паролю снова разрешён)"
+  fi
+fi
+[[ $ssh_changed == 1 && $ASSUME_YES == 1 ]] &&
+  warn "вход по паролю отключён: проверьте новый вход по ключу, не закрывая текущую сессию"
 
 ok "harden.sh завершён. Проверка: sudo ./scripts/security-check.sh"
