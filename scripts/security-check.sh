@@ -131,7 +131,7 @@ if [[ -n ${PUBLIC_URL:-} && ${PUBLIC_URL} == https://* ]]; then
   headers=$(curl -fsSI -m 10 "$PUBLIC_URL/" 2>/dev/null || true)
   if ! grep -qi '^content-security-policy:' <<<"$headers"; then
     # the public address did not answer (fresh quick tunnel, network): ask Caddy from inside
-    inner=$(compose exec -T caddy wget -S -q -O /dev/null http://localhost:8080/ 2>&1 | sed 's/^ *//' || true)
+    inner=$(compose exec -T caddy wget -S -q -O /dev/null http://127.0.0.1:8080/ 2>&1 | sed 's/^ *//' || true)
     if grep -qi '^content-security-policy:' <<<"$inner"; then
       warnx "$PUBLIC_URL не отдал заголовки (туннель или сеть) — проверены заголовки Caddy изнутри"
       headers=$inner

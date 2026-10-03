@@ -77,13 +77,13 @@ compose up -d --remove-orphans
 
 step "Смоук-тест"
 for _ in $(seq 1 60); do
-  compose exec -T caddy wget -q -O /dev/null http://localhost:8080/api/health 2>/dev/null && break
+  compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8080/api/health 2>/dev/null && break
   sleep 2
 done
-compose exec -T caddy wget -q -O /dev/null http://localhost:8080/api/health
-compose exec -T caddy wget -q -O /dev/null http://localhost:8080/api/game/health
-compose exec -T caddy wget -q -O - http://localhost:8080/api/catalog | grep -q '"clips"'
-compose exec -T caddy wget -q -O - --post-data '' http://localhost:8080/api/rooms | grep -q '"code"'
+compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8080/api/health
+compose exec -T caddy wget -q -O /dev/null http://127.0.0.1:8080/api/game/health
+compose exec -T caddy wget -q -O - http://127.0.0.1:8080/api/catalog | grep -q '"clips"'
+compose exec -T caddy wget -q -O - --post-data '' http://127.0.0.1:8080/api/rooms | grep -q '"code"'
 trap - ERR
 ok "обновлено до ${new_version}"
 if [[ ${TUNNEL_MODE:-} == quick ]]; then
