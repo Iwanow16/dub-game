@@ -37,6 +37,7 @@ step "Запуск"
 compose up -d --remove-orphans
 
 if [[ $WAIT == 1 ]]; then
+  info "жду готовности сервисов (до 3 минут на медленном сервере)…"
   for i in $(seq 1 90); do
     unhealthy=$(compose ps --format '{{.Service}} {{.Health}}' | awk '$2 != "" && $2 != "healthy" {print $1}' | sort -u)
     [[ -z $unhealthy ]] && break
@@ -47,11 +48,14 @@ if [[ $WAIT == 1 ]]; then
 fi
 
 if [[ ${TUNNEL_MODE:-} == quick ]]; then
+  info "жду адрес быстрого туннеля от Cloudflare (до 1,5 минуты)…"
   refresh_quick_url 90
+  [[ -z $PUBLIC_URL ]] || ok "адрес игры: $PUBLIC_URL"
   [[ -n $PUBLIC_URL ]] || warn "быстрый туннель не выдал адрес — ./scripts/logs.sh cloudflared (trycloudflare.com бывает недоступен; повторите ./scripts/restart.sh)"
 fi
 
 if [[ -n ${PUBLIC_URL:-} && ${PUBLIC_URL} == https://* ]]; then
+  info "проверяю, открывается ли адрес из интернета (до 1,5 минуты; игра уже запущена — можно прервать Ctrl+C)…"
   if wait_http "${PUBLIC_URL}/api/health" 90; then
     ok "публичный адрес отвечает"
   elif [[ ${TUNNEL_MODE:-} == quick ]]; then
