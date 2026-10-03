@@ -19,10 +19,10 @@ for a in "$@"; do [[ $a == -y || $a == --yes ]] && ASSUME_YES=1; done
 load_env
 CONF_DIR="$INSTALL_DIR/infra/cloudflared"
 
-recreate() { compose up -d --force-recreate cloudflared; }
 
 case $cmd in
   info)
+    [[ ${TUNNEL_MODE:-} == quick ]] && refresh_quick_url 0
     info "режим: ${TUNNEL_MODE:-?}"
     info "адрес: ${PUBLIC_URL:-—}"
     compose ps cloudflared --format '{{.Name}} {{.State}} {{.Health}}' || true
@@ -30,10 +30,15 @@ case $cmd in
     ;;
 
   quick)
+    # Clip Studio is only reachable over SSH (ssh -L 8080:…) — under the studio.localhost name
+    env_set "$ENV_FILE" PLAY_HOST localhost
+    env_set "$ENV_FILE" STUDIO_HOST studio.localhost
     env_set "$ENV_FILE" TUNNEL_MODE quick
     env_set "$ENV_FILE" TUNNEL_COMMAND "tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://caddy:8080"
     env_set "$ENV_FILE" TUNNEL_REPLICAS 1
     env_set "$ENV_FILE" ALLOWED_ORIGINS ""
+    env_set "$ENV_FILE" PUBLIC_URL ""
+    env_set "$ENV_FILE" STUDIO_URL "http://studio.localhost:8080 (через ssh -L 8080:127.0.0.1:8080)"
     "$(dirname "$0")/start.sh" --yes
     ;;
 
@@ -43,13 +48,29 @@ case $cmd in
     [[ -n $token ]] || die "токен не задан"
     token=$(clean_tunnel_token "$token")
     [[ $token =~ ^eyJ[A-Za-z0-9_=+/-]+$ ]] || die "это не похоже на токен туннеля (строка, начинающаяся с eyJ)"
+    if [[ ${PLAY_HOST:-localhost} == localhost ]]; then
+      # coming from quick/none: the stack needs real hostnames (Public Hostnames of the tunnel)
+      [[ ${DOMAIN:-localhost} != localhost ]] && default_domain=$DOMAIN
+      NEW_DOMAIN=${NEW_DOMAIN:-}
+      ask NEW_DOMAIN "Домен в Cloudflare" "${default_domain:-}"
+      [[ -n $NEW_DOMAIN && $NEW_DOMAIN != localhost ]] ||
+        die "нужен домен: NEW_DOMAIN=example.com sudo -E ./scripts/tunnel.sh token <TOKEN>"
+      env_set "$ENV_FILE" DOMAIN "$NEW_DOMAIN"
+      env_set "$ENV_FILE" PLAY_HOST "play.${NEW_DOMAIN}"
+      env_set "$ENV_FILE" STUDIO_HOST "studio.${NEW_DOMAIN}"
+      load_env
+    fi
     env_set "$ENV_FILE" TUNNEL_MODE token
     env_set "$ENV_FILE" TUNNEL_TOKEN "$token"
     env_set "$ENV_FILE" TUNNEL_COMMAND "tunnel --no-autoupdate --metrics 0.0.0.0:2000 run"
     env_set "$ENV_FILE" TUNNEL_REPLICAS 2
-    load_env
-    recreate
-    ok "туннель перезапущен с новым токеном"
+    env_set "$ENV_FILE" PUBLIC_URL "https://${PLAY_HOST}"
+    env_set "$ENV_FILE" STUDIO_URL "https://${STUDIO_HOST}"
+    env_set "$ENV_FILE" ALLOWED_ORIGINS "https://${PLAY_HOST}"
+    ok "режим token: ${PLAY_HOST}, ${STUDIO_HOST} — в панели туннеля оба Public Hostname → HTTP caddy:8080"
+    # caddy (Studio hostname, no loopback port) and cloudflared change: start.sh applies it all
+    "$(dirname "$0")/start.sh" --yes
+    [[ -n ${CF_ACCESS_AUD:-} ]] || info "Закройте Studio Cloudflare Access: ./scripts/tunnel.sh access"
     ;;
 
   create)

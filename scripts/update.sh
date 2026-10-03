@@ -85,3 +85,7 @@ compose exec -T caddy wget -q -O - http://localhost:8080/api/catalog | grep -q '
 compose exec -T caddy wget -q -O - --post-data '' http://localhost:8080/api/rooms | grep -q '"code"'
 trap - ERR
 ok "обновлено до ${new_version}"
+if [[ ${TUNNEL_MODE:-} == quick ]]; then
+  refresh_quick_url 90
+  info "Игра: ${PUBLIC_URL:-адрес ещё не получен — ./scripts/tunnel.sh info}"
+fi

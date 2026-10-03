@@ -126,8 +126,17 @@ step "Cloudflare и веб"
 if [[ ${TUNNEL_MODE:-} != quick && ${TUNNEL_MODE:-} != none ]]; then
   [[ -n ${CF_ACCESS_AUD:-} ]] && pass "Clip Studio за Cloudflare Access" || fail "Clip Studio не закрыт Cloudflare Access — ./scripts/tunnel.sh access"
 fi
+[[ ${TUNNEL_MODE:-} == quick ]] && refresh_quick_url 0
 if [[ -n ${PUBLIC_URL:-} && ${PUBLIC_URL} == https://* ]]; then
   headers=$(curl -fsSI -m 10 "$PUBLIC_URL/" 2>/dev/null || true)
+  if ! grep -qi '^content-security-policy:' <<<"$headers"; then
+    # the public address did not answer (fresh quick tunnel, network): ask Caddy from inside
+    inner=$(compose exec -T caddy wget -S -q -O /dev/null http://localhost:8080/ 2>&1 | sed 's/^ *//' || true)
+    if grep -qi '^content-security-policy:' <<<"$inner"; then
+      warnx "$PUBLIC_URL не отдал заголовки (туннель или сеть) — проверены заголовки Caddy изнутри"
+      headers=$inner
+    fi
+  fi
   for h in content-security-policy strict-transport-security x-content-type-options referrer-policy permissions-policy; do
     grep -qi "^$h:" <<<"$headers" && pass "заголовок $h" || fail "нет заголовка $h"
   done

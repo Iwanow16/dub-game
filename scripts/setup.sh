@@ -82,7 +82,8 @@ case $TUNNEL_MODE in
   quick)
     env_set "$ENV_FILE" TUNNEL_COMMAND "tunnel --no-autoupdate --metrics 0.0.0.0:2000 --url http://caddy:8080"
     env_set "$ENV_FILE" TUNNEL_REPLICAS 1
-    env_set "$ENV_FILE" PUBLIC_URL ""
+    # the running tunnel's address stays (start.sh refreshes it)
+    [[ $(env_get "$ENV_FILE" PUBLIC_URL) == *.trycloudflare.com ]] || env_set "$ENV_FILE" PUBLIC_URL ""
     env_set "$ENV_FILE" STUDIO_URL "http://studio.localhost:8080 (через ssh -L 8080:127.0.0.1:8080)"
     env_set "$ENV_FILE" ALLOWED_ORIGINS ""
     ;;
